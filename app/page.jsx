@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
+import { track as trackEvent } from '@vercel/analytics';
 
 // ponytail: unofficial JioSaavn API, swap the host if it goes down like musicapi.x007 did
 const SAAVN = 'https://saavn.sumit.co/api';
@@ -230,22 +231,275 @@ const icons = {
   library: 'M4 4v16M9 4v16M14 5l5 15',
   settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
-  trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14'
+  trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14',
+  automix: 'M2 17h20M2 7h20M7 3v8M17 13v8M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'
 };
 
 function Icon({ name, fill = false, size = 22 }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill={fill ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={fill ? 0 : 2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={icons[name]} /></svg>;
 }
 
-// Sur = melody: a sound wave that doubles as an "S", with a gold note-head. Same art lives in app/icon.svg.
+function updateFavicon(url) {
+  if (typeof document === 'undefined') return;
+  try {
+    const existing = document.querySelectorAll("link[rel*='icon']");
+    existing.forEach(el => el.remove());
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.type = url.endsWith('.svg') ? 'image/svg+xml' : 'image/jpeg';
+    link.href = url;
+    document.head.appendChild(link);
+  } catch {}
+}
+
+function WeatherCanvas({ effect }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !effect || effect === 'none') return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId;
+    let width = (canvas.width = canvas.parentElement?.offsetWidth || window.innerWidth);
+    let height = (canvas.height = canvas.parentElement?.offsetHeight || window.innerHeight);
+
+    const handleResize = () => {
+      if (!canvas || !canvas.parentElement) return;
+      width = canvas.width = canvas.parentElement.offsetWidth;
+      height = canvas.height = canvas.parentElement.offsetHeight;
+    };
+    window.addEventListener('resize', handleResize);
+
+    // Rain particles
+    const rainDrops = Array.from({ length: 75 }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      len: 16 + Math.random() * 20,
+      speed: 12 + Math.random() * 10,
+      alpha: 0.15 + Math.random() * 0.35,
+      slant: -1.5 + Math.random() * 3
+    }));
+
+    // Cloudy mist puffs
+    const cloudPuffs = Array.from({ length: 7 }, (_, i) => ({
+      x: (i / 7) * width + Math.random() * 120,
+      y: 60 + Math.random() * Math.min(height * 0.6, 380),
+      radius: 120 + Math.random() * 160,
+      speed: 0.15 + Math.random() * 0.25,
+      alpha: 0.035 + Math.random() * 0.045
+    }));
+
+    // Sunny shimmer motes
+    const motes = Array.from({ length: 35 }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      r: 1.5 + Math.random() * 2.5,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: -0.2 - Math.random() * 0.5,
+      alpha: 0.2 + Math.random() * 0.5,
+      baseAlpha: 0.2 + Math.random() * 0.5,
+      pulse: Math.random() * Math.PI * 2
+    }));
+
+    // Snow flakes
+    const flakes = Array.from({ length: 55 }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      r: 1.5 + Math.random() * 3,
+      speed: 1 + Math.random() * 2,
+      drift: Math.random() * Math.PI * 2,
+      alpha: 0.25 + Math.random() * 0.5
+    }));
+
+    let lightningTimer = 0;
+    let lightningFlash = 0;
+    let tick = 0;
+
+    const render = () => {
+      tick++;
+      ctx.clearRect(0, 0, width, height);
+
+      if (effect === 'rain' || effect === 'storm') {
+        ctx.lineWidth = 1.2;
+        ctx.lineCap = 'round';
+        for (const drop of rainDrops) {
+          ctx.strokeStyle = `rgba(170, 205, 255, ${drop.alpha})`;
+          ctx.beginPath();
+          ctx.moveTo(drop.x, drop.y);
+          ctx.lineTo(drop.x + drop.slant, drop.y + drop.len);
+          ctx.stroke();
+
+          drop.y += drop.speed;
+          drop.x += drop.slant * 0.3;
+          if (drop.y > height) {
+            drop.y = -drop.len;
+            drop.x = Math.random() * width;
+          }
+        }
+
+        if (effect === 'storm') {
+          lightningTimer++;
+          if (lightningTimer > 220 && Math.random() < 0.02) {
+            lightningFlash = 1;
+            lightningTimer = 0;
+          }
+          if (lightningFlash > 0) {
+            ctx.fillStyle = `rgba(235, 242, 255, ${lightningFlash * 0.16})`;
+            ctx.fillRect(0, 0, width, height);
+            lightningFlash -= 0.08;
+          }
+        }
+      } else if (effect === 'cloudy') {
+        for (const c of cloudPuffs) {
+          const grad = ctx.createRadialGradient(c.x, c.y, c.radius * 0.15, c.x, c.y, c.radius);
+          grad.addColorStop(0, `rgba(180, 195, 235, ${c.alpha * 1.4})`);
+          grad.addColorStop(0.6, `rgba(140, 160, 210, ${c.alpha * 0.7})`);
+          grad.addColorStop(1, 'rgba(100, 120, 170, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          c.x += c.speed;
+          if (c.x - c.radius > width) {
+            c.x = -c.radius;
+            c.y = 40 + Math.random() * Math.min(height * 0.6, 380);
+          }
+        }
+      } else if (effect === 'sunny') {
+        const sunX = width * 0.85;
+        const sunY = 40;
+        const sunGrad = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, Math.min(width, 600));
+        sunGrad.addColorStop(0, 'rgba(255, 205, 110, 0.14)');
+        sunGrad.addColorStop(0.4, 'rgba(255, 140, 60, 0.07)');
+        sunGrad.addColorStop(1, 'rgba(255, 120, 50, 0)');
+        ctx.fillStyle = sunGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        const rayAngle = Math.sin(tick * 0.005) * 0.18 + 0.85;
+        ctx.save();
+        ctx.translate(sunX, sunY);
+        ctx.rotate(rayAngle);
+        const rayGrad = ctx.createLinearGradient(0, 0, 0, height);
+        rayGrad.addColorStop(0, 'rgba(255, 230, 150, 0.07)');
+        rayGrad.addColorStop(0.5, 'rgba(255, 190, 100, 0.025)');
+        rayGrad.addColorStop(1, 'rgba(255, 170, 80, 0)');
+        ctx.fillStyle = rayGrad;
+        ctx.beginPath();
+        ctx.moveTo(-90, 0);
+        ctx.lineTo(90, 0);
+        ctx.lineTo(260, height * 1.2);
+        ctx.lineTo(-260, height * 1.2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        for (const m of motes) {
+          m.pulse += 0.03;
+          const a = m.baseAlpha * (0.6 + 0.4 * Math.sin(m.pulse));
+          ctx.fillStyle = `rgba(255, 225, 140, ${a})`;
+          ctx.beginPath();
+          ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
+          ctx.fill();
+
+          m.x += m.vx;
+          m.y += m.vy;
+          if (m.y < -10) m.y = height + 10;
+          if (m.x < 0) m.x = width;
+          if (m.x > width) m.x = 0;
+        }
+      } else if (effect === 'snow') {
+        for (const f of flakes) {
+          f.drift += 0.02;
+          ctx.fillStyle = `rgba(255, 255, 255, ${f.alpha})`;
+          ctx.beginPath();
+          ctx.arc(f.x + Math.sin(f.drift) * 1.5, f.y, f.r, 0, Math.PI * 2);
+          ctx.fill();
+
+          f.y += f.speed;
+          f.x += Math.cos(f.drift) * 0.5;
+          if (f.y > height) {
+            f.y = -f.r;
+            f.x = Math.random() * width;
+          }
+        }
+      }
+
+      animId = requestAnimationFrame(render);
+    };
+
+    animId = requestAnimationFrame(render);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [effect]);
+
+  if (!effect || effect === 'none') return null;
+
+  return <canvas ref={canvasRef} className="weatherCanvas" aria-hidden="true" />;
+}
+
+function WeatherWidget({ weatherState, weatherMode, onChangeMode, open, onToggleOpen }) {
+  const currentIcon = weatherMode === 'auto' ? weatherState.icon : (
+    { rain: '🌧️', cloudy: '☁️', sunny: '☀️', storm: '⚡', snow: '❄️', none: '🚫' }[weatherMode] || '☀️'
+  );
+  const currentLabel = weatherMode === 'auto' ? `${weatherState.label}${weatherState.temp != null ? ` · ${Math.round(weatherState.temp)}°` : ''}` : (
+    { rain: 'Raining', cloudy: 'Cloudy', sunny: 'Sunny', storm: 'Storm', snow: 'Snow', none: 'Clear' }[weatherMode]
+  );
+
+  return (
+    <div className="weatherWidget">
+      <button
+        type="button"
+        className="weatherPill"
+        onClick={onToggleOpen}
+        title="Homescreen Weather Mood"
+        aria-label="Homescreen Weather Mood"
+      >
+        <span className="weatherIcon">{currentIcon}</span>
+        <span className="weatherLabel">{currentLabel}</span>
+        {weatherMode !== 'auto' && <span className="weatherDot" />}
+      </button>
+      {open && (
+        <div className="weatherMenu" onClick={e => e.stopPropagation()}>
+          <div className="weatherMenuTitle">
+            <strong>Homescreen Effect</strong>
+            <small>{weatherMode === 'auto' ? (weatherState.city ? `Live in ${weatherState.city}` : 'Live weather') : 'Custom mood'}</small>
+          </div>
+          <div className="weatherGrid">
+            {[
+              { id: 'auto', label: 'Auto (Live)', icon: '🌐' },
+              { id: 'rain', label: 'Raining', icon: '🌧️' },
+              { id: 'cloudy', label: 'Cloudy', icon: '☁️' },
+              { id: 'sunny', label: 'Sunny', icon: '☀️' },
+              { id: 'storm', label: 'Storm', icon: '⚡' },
+              { id: 'snow', label: 'Snow', icon: '❄️' },
+              { id: 'none', label: 'Off', icon: '🚫' }
+            ].map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                className={`weatherOpt ${weatherMode === opt.id ? 'active' : ''}`}
+                onClick={() => onChangeMode(opt.id)}
+              >
+                <span>{opt.icon}</span>
+                <small>{opt.label}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// App icon: rendered from /icon.png
 function Logo({ size = 38 }) {
-  return <svg className="logo" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
-    <defs><linearGradient id="surGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#8b6cff" /><stop offset="1" stopColor="#ff5fa2" /></linearGradient></defs>
-    <rect width="48" height="48" rx="14" fill="url(#surGrad)" />
-    <path d="M31 15.5c-2-2-4.6-2.5-7-2.5-4 0-7 2.2-7 5.5 0 7.5 14 4.5 14 11.5 0 3.3-3 5.5-7 5.5-2.6 0-5.2-.7-7-2.7" fill="none" stroke="#fff" strokeWidth="3.4" strokeLinecap="round" />
-    <path d="M9 24h3M36 24h3" stroke="#fff" strokeOpacity=".55" strokeWidth="2.4" strokeLinecap="round" />
-    <circle cx="33.5" cy="14" r="3" fill="#f3d55b" />
-  </svg>;
+  return <img className="logo" src="/icon.png" width={size} height={size} alt="Sur" style={{ borderRadius: size > 40 ? 14 : 11, objectFit: 'cover' }} />;
 }
 
 function Brand() {
@@ -453,6 +707,123 @@ export default function Home() {
   const [status, setStatus] = useState('');
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [automix, setAutomix] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sur-automix');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+  const [crossfadeSec, setCrossfadeSec] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sur-crossfade');
+      return saved ? Number(saved) : 6;
+    } catch {
+      return 6;
+    }
+  });
+  const [isMixing, setIsMixing] = useState(false);
+  const [weatherState, setWeatherState] = useState({
+    condition: 'sunny',
+    label: 'Sunny',
+    temp: null,
+    city: '',
+    icon: '☀️'
+  });
+  const [weatherMode, setWeatherMode] = useState(() => {
+    try {
+      return localStorage.getItem('sur-weather-mode') || 'auto';
+    } catch {
+      return 'auto';
+    }
+  });
+  const [weatherMenuOpen, setWeatherMenuOpen] = useState(false);
+
+  const changeWeatherMode = mode => {
+    setWeatherMode(mode);
+    try { localStorage.setItem('sur-weather-mode', mode); } catch {}
+  };
+
+  const activeWeatherEffect = weatherMode === 'auto' ? weatherState.condition : weatherMode;
+
+  useEffect(() => {
+    if (!weatherMenuOpen) return;
+    const closeMenu = () => setWeatherMenuOpen(false);
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
+  }, [weatherMenuOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchWeatherForCoords = async (lat, lon, cityName = '') => {
+      try {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,temperature_2m,is_day`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled || !data?.current) return;
+
+        const code = data.current.weather_code;
+        const temp = data.current.temperature_2m;
+        const isDay = data.current.is_day !== 0;
+
+        let condition = 'sunny';
+        let label = isDay ? 'Sunny' : 'Clear Night';
+        let icon = isDay ? '☀️' : '🌙';
+
+        if ([95, 96, 99].includes(code)) {
+          condition = 'storm';
+          label = 'Thunderstorm';
+          icon = '⚡';
+        } else if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) {
+          condition = 'rain';
+          label = 'Raining';
+          icon = '🌧️';
+        } else if ([71, 73, 75, 77, 85, 86].includes(code)) {
+          condition = 'snow';
+          label = 'Snowing';
+          icon = '❄️';
+        } else if ([1, 2, 3, 45, 48].includes(code)) {
+          condition = 'cloudy';
+          label = code === 3 ? 'Overcast' : 'Cloudy';
+          icon = '☁️';
+        }
+
+        setWeatherState({ condition, label, temp, city: cityName, icon });
+      } catch {}
+    };
+
+    (async () => {
+      try {
+        const geoRes = await fetch('https://get.geojs.io/v1/ip/geo.json');
+        if (geoRes.ok) {
+          const geo = await geoRes.json();
+          if (geo?.latitude && geo?.longitude && !cancelled) {
+            await fetchWeatherForCoords(geo.latitude, geo.longitude, geo.city || '');
+          }
+        }
+      } catch {}
+
+      if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            if (!cancelled) fetchWeatherForCoords(pos.coords.latitude, pos.coords.longitude);
+          },
+          () => {},
+          { timeout: 7000 }
+        );
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  const transitioningRef = useRef(false);
+  const prefetchingRef = useRef(false);
+  const stepRef = useRef();
+  const togglePlayRef = useRef();
+  const seekToRef = useRef();
   const audioRef = useRef(null);
   const streamRef = useRef('');
   const loadingRef = useRef(new Set());
@@ -764,7 +1135,7 @@ export default function Home() {
   const artistHits = q ? [...artists.filter(a => norm(a.name).includes(q)), ...(results.artists || [])].filter((a, i, list) => list.findIndex(b => b.id === a.id) === i).slice(0, 6) : [];
   const showAll = searchTab === 'all';
 
-  const streamTrack = async track => {
+  const streamTrack = async (track, isAutomixTransition = false) => {
     if (!audioRef.current) return;
     setCurrentTrack(track);
     setStatus('Loading…');
@@ -792,11 +1163,17 @@ export default function Home() {
       streamRef.current = url;
       setCurrentTrack(track);
       audioRef.current.src = url;
+      if (automix && isAutomixTransition) {
+        audioRef.current.volume = 0.2;
+      } else {
+        audioRef.current.volume = 1;
+      }
       audioRef.current.load();
       await audioRef.current.play();
       setStatus(preview ? '30s preview · full song not on JioSaavn' : '');
       const played = track;
       setHistory(items => [played, ...items.filter(item => keyOf(item) !== keyOf(played))].slice(0, 50));
+      try { trackEvent('play_song', { song: track.song, artist: track.artist, automix }); } catch {}
     } catch {
       setStatus('Could not load this stream. Try another song.');
     }
@@ -827,12 +1204,12 @@ export default function Home() {
     return queue[queueIndex + 1] || pickSimilar(currentTrack, pool, played([...queue, ...history.slice(0, 20)]), prefs);
   }, [currentTrack, queue, queueIndex, queueMode, pool, history, prefs]);
 
-  const step = delta => {
+  const step = (delta, isAutomixTransition = false) => {
     if (!queue.length) return;
     if (queueMode === 'list') {
       const index = (queueIndex + delta + queue.length) % queue.length;
       setQueueIndex(index);
-      streamTrack(queue[index]);
+      streamTrack(queue[index], isAutomixTransition);
       return;
     }
     const index = queueIndex + delta;
@@ -842,7 +1219,7 @@ export default function Home() {
       setQueue(items => [...items, upNext]);
     }
     setQueueIndex(index);
-    streamTrack(queue[index] || upNext);
+    streamTrack(queue[index] || upNext, isAutomixTransition);
   };
 
   const togglePlay = async () => {
@@ -854,12 +1231,200 @@ export default function Home() {
     }
   };
 
+  stepRef.current = step;
+  togglePlayRef.current = togglePlay;
+  seekToRef.current = (seconds) => {
+    if (audioRef.current && seconds != null) {
+      audioRef.current.currentTime = seconds;
+      updateMediaPosition(seconds, audioRef.current.duration);
+    }
+  };
+
+  const toggleAutomix = () => {
+    setAutomix(prev => {
+      const next = !prev;
+      try { localStorage.setItem('sur-automix', String(next)); } catch {}
+      try { trackEvent('automix_toggle', { enabled: next }); } catch {}
+      return next;
+    });
+  };
+
+  const changeCrossfade = sec => {
+    setCrossfadeSec(sec);
+    try { localStorage.setItem('sur-crossfade', String(sec)); } catch {}
+  };
+
+  // Browser Tab Title & Dynamic Favicon
+  // Default: Title "Sur", Favicon "/icon.svg"
+  // When Music is Playing: Title "${song} - ${artist}", Favicon "${coverArt}"
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    if (currentTrack && isPlaying) {
+      document.title = `${currentTrack.song} - ${currentTrack.artist}`;
+      updateFavicon(currentTrack.img || '/icon.png');
+    } else {
+      document.title = 'Sur';
+      updateFavicon('/icon.png');
+    }
+  }, [currentTrack, isPlaying]);
+
+  // Lock Screen & Control Center metadata (MediaSession API)
+  // Fixes: iOS lock screen widget now shows actual Song Title, Artist Name, Album, and full Cover Art
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+
+    if (!currentTrack) {
+      navigator.mediaSession.metadata = null;
+      return;
+    }
+
+    let artworkUrl = currentTrack.img || '';
+    if (artworkUrl && !artworkUrl.startsWith('http://') && !artworkUrl.startsWith('https://')) {
+      artworkUrl = `${window.location.origin}${artworkUrl.startsWith('/') ? '' : '/'}${artworkUrl}`;
+    }
+    const highResArtwork = artworkUrl.replace('150x150', '500x500');
+
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: currentTrack.song || 'Unknown Song',
+        artist: currentTrack.artist || 'Sur Music',
+        album: currentTrack.album || 'Sur',
+        artwork: artworkUrl ? [
+          { src: artworkUrl, sizes: '96x96', type: 'image/jpeg' },
+          { src: artworkUrl, sizes: '128x128', type: 'image/jpeg' },
+          { src: highResArtwork, sizes: '256x256', type: 'image/jpeg' },
+          { src: highResArtwork, sizes: '384x384', type: 'image/jpeg' },
+          { src: highResArtwork, sizes: '500x500', type: 'image/jpeg' },
+          { src: highResArtwork, sizes: '512x512', type: 'image/jpeg' }
+        ] : [
+          { src: `${window.location.origin}/icon.png`, sizes: '512x512', type: 'image/png' }
+        ]
+      });
+    } catch (e) {
+      console.warn('Failed to set MediaSession metadata', e);
+    }
+  }, [currentTrack]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    } catch {}
+  }, [isPlaying]);
+
+  const updateMediaPosition = (cur, dur) => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession)) return;
+    if (dur && !isNaN(dur) && dur > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: Math.max(0, dur),
+          playbackRate: audioRef.current?.playbackRate || 1,
+          position: Math.min(Math.max(0, cur || 0), dur)
+        });
+      } catch {}
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+
+    try { navigator.mediaSession.setActionHandler('play', () => togglePlayRef.current?.()); } catch {}
+    try { navigator.mediaSession.setActionHandler('pause', () => togglePlayRef.current?.()); } catch {}
+    try { navigator.mediaSession.setActionHandler('previoustrack', () => stepRef.current?.(-1)); } catch {}
+    try { navigator.mediaSession.setActionHandler('nexttrack', () => stepRef.current?.(1)); } catch {}
+    try {
+      navigator.mediaSession.setActionHandler('seekto', details => {
+        if (details.seekTime != null) seekToRef.current?.(details.seekTime);
+      });
+    } catch {}
+    try {
+      navigator.mediaSession.setActionHandler('seekbackward', details => {
+        const skip = details.seekOffset || 10;
+        if (audioRef.current) seekToRef.current?.(Math.max(0, audioRef.current.currentTime - skip));
+      });
+    } catch {}
+    try {
+      navigator.mediaSession.setActionHandler('seekforward', details => {
+        const skip = details.seekOffset || 10;
+        if (audioRef.current) seekToRef.current?.(Math.min(audioRef.current.duration || 0, audioRef.current.currentTime + skip));
+      });
+    } catch {}
+
+    return () => {
+      try {
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('previoustrack', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+        navigator.mediaSession.setActionHandler('seekto', null);
+        navigator.mediaSession.setActionHandler('seekbackward', null);
+        navigator.mediaSession.setActionHandler('seekforward', null);
+      } catch {}
+    };
+  }, []);
+
+  const handleTimeUpdate = event => {
+    const audio = event.currentTarget;
+    if (!audio.duration) return;
+    const cur = audio.currentTime;
+    const dur = audio.duration;
+    setProgress((cur / dur) * 100);
+    updateMediaPosition(cur, dur);
+
+    // Pre-resolve upNext track URL 15s before track ends so automix crossfade transition is instant
+    if (automix && upNext && !upNext.url && dur - cur < 15 && !prefetchingRef.current) {
+      prefetchingRef.current = true;
+      (async () => {
+        try {
+          const hit = (await saavnSearch(`${upNext.song} ${upNext.artist}`)).find(item => sameTitle(item.song, upNext.song));
+          if (hit?.url) {
+            upNext.url = hit.url;
+            if (hit.img && !upNext.img) upNext.img = hit.img;
+          }
+        } catch {}
+        prefetchingRef.current = false;
+      })();
+    }
+
+    // Automix: smart crossfade
+    if (automix && dur > 20) {
+      const timeLeft = dur - cur;
+      if (timeLeft <= crossfadeSec && timeLeft > 0) {
+        setIsMixing(true);
+        // Smoothly fade down outgoing volume
+        const fadeRatio = Math.max(0.08, timeLeft / crossfadeSec);
+        audio.volume = Math.min(1, Math.max(0, fadeRatio));
+
+        // When reached within 0.8s of crossfade window, trigger seamless transition to next track
+        if (timeLeft <= 0.8 && !transitioningRef.current) {
+          transitioningRef.current = true;
+          step(1, true);
+          setTimeout(() => { transitioningRef.current = false; }, 2000);
+        }
+      } else {
+        if (isMixing) setIsMixing(false);
+        // Smooth volume fade-in when starting a track
+        if (cur < 2) {
+          const fadeInRatio = Math.min(1, Math.max(0.2, cur / 2));
+          audio.volume = fadeInRatio;
+        } else {
+          audio.volume = 1;
+        }
+      }
+    } else {
+      if (isMixing) setIsMixing(false);
+      audio.volume = 1;
+    }
+  };
+
   const isLiked = currentTrack && liked.some(item => keyOf(item) === keyOf(currentTrack));
 
   const toggleLike = () => {
     if (!currentTrack) return;
     const { song, artist: by, img, id, url, album: albumName } = currentTrack;
     setLiked(items => isLiked ? items.filter(item => keyOf(item) !== keyOf(currentTrack)) : [{ song, artist: by, img, id, url, album: albumName }, ...items]);
+    try { trackEvent('like_song', { song, artist: by }); } catch {}
   };
 
   const downloadCurrent = async event => {
@@ -881,6 +1446,7 @@ export default function Home() {
       link.click();
       link.remove();
       URL.revokeObjectURL(objectUrl);
+      try { trackEvent('download_song', { song: currentTrack.song, artist: currentTrack.artist }); } catch {}
     } catch {
       // Never navigate to a mirror URL: a blocked download must not close the player.
       setStatus('Download unavailable for this song.');
@@ -893,10 +1459,19 @@ export default function Home() {
   const seek = event => {
     const value = Number(event.target.value);
     setProgress(value);
-    if (audioRef.current?.duration) audioRef.current.currentTime = value / 100 * audioRef.current.duration;
+    if (audioRef.current?.duration) {
+      const newTime = value / 100 * audioRef.current.duration;
+      audioRef.current.currentTime = newTime;
+      updateMediaPosition(newTime, audioRef.current.duration);
+    }
   };
 
-  const seekTo = seconds => { if (audioRef.current && seconds != null) audioRef.current.currentTime = seconds; };
+  const seekTo = seconds => {
+    if (audioRef.current && seconds != null) {
+      audioRef.current.currentTime = seconds;
+      updateMediaPosition(seconds, audioRef.current.duration);
+    }
+  };
 
   const finishAuth = (account, cloudData) => {
     setUser(account);
@@ -996,7 +1571,7 @@ export default function Home() {
 
   return (
     <main className="stage">
-      <div className={`phone ${isPlaying ? 'playing' : ''}`}>
+      <div className={`phone ${isPlaying ? 'playing' : ''}`} data-weather={view === 'home' ? activeWeatherEffect : 'default'}>
         <header className="topBar">
           <Brand />
           <button className={`homeCircle ${tab === 'home' ? 'active' : ''}`} onClick={goHome} aria-label="Home"><Icon name="home" /></button>
@@ -1006,6 +1581,13 @@ export default function Home() {
             <Icon name="search" />
           </button>
           <div className="topActions">
+            <WeatherWidget
+              weatherState={weatherState}
+              weatherMode={weatherMode}
+              onChangeMode={changeWeatherMode}
+              open={weatherMenuOpen}
+              onToggleOpen={() => setWeatherMenuOpen(o => !o)}
+            />
             {user ? <button className="avatarBtn" onClick={() => go('settings')} aria-label="Account settings">{initial}</button> : <>
               <button className="signupLink" onClick={() => setAuth({ mode: 'signup' })}>Sign up</button>
               <button className="loginBtn big" onClick={() => setAuth({ mode: 'login' })}>Log in</button>
@@ -1034,12 +1616,22 @@ export default function Home() {
         </aside>
 
         <div className="scroll" ref={scrollRef}>
-          {view === 'home' && <Fragment key="home">
+          {view === 'home' && <div className="homeWrapper" data-weather={activeWeatherEffect} key="home">
+            <WeatherCanvas effect={activeWeatherEffect} />
             <section className="homeTop">
               <div className="homeBar">
                 <Brand />
-                {user ? <button className="avatarBtn" onClick={() => go('settings')} aria-label="Account settings">{initial}</button>
-                  : <button className="loginBtn" onClick={() => setAuth({ mode: 'login' })}>Log in</button>}
+                <div className="homeBarRight">
+                  <WeatherWidget
+                    weatherState={weatherState}
+                    weatherMode={weatherMode}
+                    onChangeMode={changeWeatherMode}
+                    open={weatherMenuOpen}
+                    onToggleOpen={() => setWeatherMenuOpen(o => !o)}
+                  />
+                  {user ? <button className="avatarBtn" onClick={() => go('settings')} aria-label="Account settings">{initial}</button>
+                    : <button className="loginBtn" onClick={() => setAuth({ mode: 'login' })}>Log in</button>}
+                </div>
               </div>
               <h1 className="homeTitle">{greeting}{profile?.name ? `, ${profile.name}` : ''}</h1>
               <button className="search" onClick={() => openSearch()}>
@@ -1124,7 +1716,7 @@ export default function Home() {
                   {!topSongs.length && <div className="empty">Loading songs…</div>}
                 </div>
             </section>
-          </Fragment>}
+          </div>}
 
           {view === 'search' && <section key="search" className="page">
             <Header title="Search" crumbs={['Home', 'Search']} onBack={back} />
@@ -1183,6 +1775,43 @@ export default function Home() {
                 </div>}
               </div>
               <div className="menu flush">
+                <div className="menuItem staticItem">
+                  <span className={`menuIcon ${automix ? 'accentGrad' : ''}`}><Icon name="automix" /></span>
+                  <div className="rowText">
+                    <strong>Automix (Smart Transitions)</strong>
+                    <small>Crossfades songs seamlessly with zero silence</small>
+                  </div>
+                  <button
+                    type="button"
+                    className={`toggleSwitch ${automix ? 'on' : ''}`}
+                    onClick={toggleAutomix}
+                    role="switch"
+                    aria-checked={automix}
+                    aria-label="Toggle Automix"
+                  >
+                    <span className="toggleHandle" />
+                  </button>
+                </div>
+                {automix && (
+                  <div className="crossfadeSettings">
+                    <div className="crossfadeHeader">
+                      <span>Crossfade duration</span>
+                      <strong>{crossfadeSec}s</strong>
+                    </div>
+                    <div className="crossfadeButtons">
+                      {[3, 5, 6, 8, 10, 12].map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          className={`crossfadeBtn ${crossfadeSec === s ? 'active' : ''}`}
+                          onClick={() => changeCrossfade(s)}
+                        >
+                          {s}s
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <button className="menuItem" onClick={() => setEditingTaste(true)}>
                   <span className="menuIcon"><Icon name="user" /></span>
                   <span className="rowText"><strong>Your taste</strong><small>{tasteSummary}</small></span>
@@ -1312,11 +1941,37 @@ export default function Home() {
           </section>}
 
           {view === 'player' && currentTrack && <section key={`player-${currentTrack.id}`} className="playerScreen">
-            <div className="playerTop"><span>Now playing{currentTrack.album ? ` · ${currentTrack.album}` : ''}</span><button type="button" className="iconBtn round" onClick={closePlayer} aria-label="Close player"><Icon name="down" /></button></div>
+            <div className="playerTop">
+              <span>Now playing{currentTrack.album ? ` · ${currentTrack.album}` : ''}</span>
+              <div className="playerTopActions">
+                <button
+                  type="button"
+                  className={`automixPill ${automix ? 'active' : ''}`}
+                  onClick={toggleAutomix}
+                  title={`Automix ${automix ? 'ON (Smart crossfade active)' : 'OFF'}`}
+                  aria-label="Toggle Automix"
+                >
+                  <Icon name="automix" size={14} />
+                  <span>Automix</span>
+                  {automix && <span className="automixDot" />}
+                </button>
+                <button type="button" className="iconBtn round" onClick={closePlayer} aria-label="Close player"><Icon name="down" /></button>
+              </div>
+            </div>
             <div className="art">
               <div className="vinyl" />
               <img src={currentTrack.img} alt="" />
             </div>
+            {isMixing && (
+              <div className="automixBanner">
+                <span className="pulseWave">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+                <span>Automixing into {upNext ? upNext.song : 'next track'}…</span>
+              </div>
+            )}
             <div className="controls">
               <button onClick={toggleLike} className={isLiked ? 'on' : ''} aria-label="Like"><Icon name="heart" fill={isLiked} size={20} /></button>
               <button onClick={() => step(-1)} aria-label="Previous"><Icon name="prev" fill /></button>
@@ -1363,6 +2018,15 @@ export default function Home() {
               </div>
             </div>
             <div className="miniActions">
+              <button
+                type="button"
+                className={`miniAutomixBtn ${automix ? 'on' : ''}`}
+                onClick={toggleAutomix}
+                title={`Automix ${automix ? 'ON' : 'OFF'}`}
+                aria-label="Toggle Automix"
+              >
+                <Icon name="automix" size={18} />
+              </button>
               <button onClick={() => go('player')} aria-label="Lyrics">Lyrics</button>
               <button onClick={toggleLike} className={isLiked ? 'on' : ''} aria-label="Like"><Icon name="heart" fill={isLiked} size={18} /></button>
               <button type="button" onClick={downloadCurrent} aria-label="Download"><Icon name="download" size={18} /></button>
@@ -1469,7 +2133,19 @@ export default function Home() {
           onClose={profile ? () => setEditingTaste(false) : () => saveProfile({ name: '', languages: ['punjabi'], artists: DEFAULT_ARTISTS })}
         />}
 
-        <audio ref={audioRef} preload="metadata" onTimeUpdate={event => event.currentTarget.duration && setProgress(event.currentTarget.currentTime / event.currentTarget.duration * 100)} onLoadedMetadata={event => setDuration(event.currentTarget.duration)} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => step(1)} />
+        <audio
+          ref={audioRef}
+          preload="metadata"
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={event => {
+            const dur = event.currentTarget.duration;
+            setDuration(dur);
+            updateMediaPosition(event.currentTarget.currentTime, dur);
+          }}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onEnded={() => step(1)}
+        />
       </div>
     </main>
   );

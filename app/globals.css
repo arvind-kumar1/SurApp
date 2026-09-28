@@ -29,7 +29,10 @@ h1, h2, p { margin: 0; }
 }
 
 /* Shell + drifting liquid background */
-.phone { position: relative; width: 100%; height: 100dvh; overflow: hidden; isolation: isolate; }
+.phone {
+  position: relative; width: 100%; height: 100dvh; overflow: hidden; isolation: isolate;
+  transition: --bg 0.6s ease, --pink 0.6s ease, --violet 0.6s ease;
+}
 .phone::before {
   content: ''; position: absolute; inset: -25%; z-index: -1; pointer-events: none;
   background:
@@ -38,9 +41,131 @@ h1, h2, p { margin: 0; }
     radial-gradient(36% 36% at 50% 95%, rgba(243, 213, 91, .22), transparent 70%),
     radial-gradient(30% 30% at 92% 85%, rgba(56, 189, 248, .3), transparent 70%);
   filter: blur(50px); animation: drift 22s ease-in-out infinite alternate;
+  transition: opacity 0.8s ease;
 }
 .phone.playing::before { animation-duration: 9s; }
 @keyframes drift { to { transform: translate3d(5%, -4%, 0) rotate(10deg) scale(1.1); } }
+
+/* Homescreen Weather Themes */
+/* 1. Sunny Theme: Radiant warm golden amber, sunburst orange, solar glow */
+.phone[data-weather="sunny"] {
+  --bg: #0f0a04;
+  --accent: linear-gradient(135deg, #f59e0b, #ea580c);
+  --pink: #f59e0b;
+  --violet: #f97316;
+  --yellow: #fbbf24;
+}
+.phone[data-weather="sunny"]::before {
+  background:
+    radial-gradient(42% 42% at 15% 15%, rgba(245, 158, 11, .75), transparent 70%),
+    radial-gradient(38% 38% at 85% 20%, rgba(251, 146, 60, .65), transparent 70%),
+    radial-gradient(40% 40% at 50% 90%, rgba(234, 88, 12, .45), transparent 70%),
+    radial-gradient(32% 32% at 90% 80%, rgba(253, 224, 71, .55), transparent 70%);
+}
+.phone[data-weather="sunny"] .wordmark {
+  background: linear-gradient(120deg, #fff 20%, #fde047 60%, #f97316);
+  -webkit-background-clip: text; background-clip: text;
+}
+.phone[data-weather="sunny"] .weatherPill {
+  border-color: rgba(245, 158, 11, .5); background: rgba(245, 158, 11, .15);
+  box-shadow: 0 0 16px rgba(245, 158, 11, .3);
+}
+
+/* 2. Raining Theme: Deep oceanic blue, cyan rain neon, rainy night vibe */
+.phone[data-weather="rain"] {
+  --bg: #040813;
+  --accent: linear-gradient(135deg, #0284c7, #06b6d4);
+  --pink: #38bdf8;
+  --violet: #2563eb;
+  --yellow: #38bdf8;
+}
+.phone[data-weather="rain"]::before {
+  background:
+    radial-gradient(40% 40% at 18% 18%, rgba(37, 99, 235, .75), transparent 70%),
+    radial-gradient(36% 36% at 85% 25%, rgba(6, 182, 212, .65), transparent 70%),
+    radial-gradient(38% 38% at 50% 90%, rgba(30, 58, 138, .65), transparent 70%),
+    radial-gradient(32% 32% at 85% 85%, rgba(56, 189, 248, .5), transparent 70%);
+}
+.phone[data-weather="rain"] .wordmark {
+  background: linear-gradient(120deg, #fff 20%, #7dd3fc 60%, #0284c7);
+  -webkit-background-clip: text; background-clip: text;
+}
+.phone[data-weather="rain"] .weatherPill {
+  border-color: rgba(6, 182, 212, .5); background: rgba(6, 182, 212, .15);
+  box-shadow: 0 0 16px rgba(6, 182, 212, .3);
+}
+
+/* 3. Cloudy Theme: Atmospheric mist, moody slate, silver fog */
+.phone[data-weather="cloudy"] {
+  --bg: #080a10;
+  --accent: linear-gradient(135deg, #94a3b8, #64748b);
+  --pink: #cbd5e1;
+  --violet: #94a3b8;
+  --yellow: #e2e8f0;
+}
+.phone[data-weather="cloudy"]::before {
+  background:
+    radial-gradient(42% 42% at 20% 20%, rgba(148, 163, 184, .55), transparent 70%),
+    radial-gradient(36% 36% at 85% 25%, rgba(100, 116, 139, .5), transparent 70%),
+    radial-gradient(40% 40% at 50% 90%, rgba(51, 65, 85, .6), transparent 70%),
+    radial-gradient(30% 30% at 85% 85%, rgba(203, 213, 225, .4), transparent 70%);
+}
+.phone[data-weather="cloudy"] .wordmark {
+  background: linear-gradient(120deg, #fff 20%, #cbd5e1 60%, #94a3b8);
+  -webkit-background-clip: text; background-clip: text;
+}
+.phone[data-weather="cloudy"] .weatherPill {
+  border-color: rgba(148, 163, 184, .5); background: rgba(148, 163, 184, .15);
+  box-shadow: 0 0 16px rgba(148, 163, 184, .25);
+}
+
+/* 4. Thunderstorm Theme: Dark tempest, deep electric violet & lightning neon */
+.phone[data-weather="storm"] {
+  --bg: #070310;
+  --accent: linear-gradient(135deg, #a855f7, #06b6d4);
+  --pink: #c084fc;
+  --violet: #7c3aed;
+  --yellow: #38bdf8;
+}
+.phone[data-weather="storm"]::before {
+  background:
+    radial-gradient(40% 40% at 18% 18%, rgba(124, 58, 237, .8), transparent 70%),
+    radial-gradient(35% 35% at 85% 25%, rgba(6, 182, 212, .65), transparent 70%),
+    radial-gradient(38% 38% at 50% 95%, rgba(76, 29, 149, .75), transparent 70%),
+    radial-gradient(30% 30% at 92% 85%, rgba(168, 85, 247, .6), transparent 70%);
+}
+.phone[data-weather="storm"] .wordmark {
+  background: linear-gradient(120deg, #fff 20%, #c084fc 60%, #38bdf8);
+  -webkit-background-clip: text; background-clip: text;
+}
+.phone[data-weather="storm"] .weatherPill {
+  border-color: rgba(168, 85, 247, .5); background: rgba(168, 85, 247, .15);
+  box-shadow: 0 0 16px rgba(168, 85, 247, .3);
+}
+
+/* 5. Snow Theme: Arctic frost, icy cyan chill, diamond frost */
+.phone[data-weather="snow"] {
+  --bg: #040912;
+  --accent: linear-gradient(135deg, #38bdf8, #bae6fd);
+  --pink: #bae6fd;
+  --violet: #38bdf8;
+  --yellow: #e0f2fe;
+}
+.phone[data-weather="snow"]::before {
+  background:
+    radial-gradient(42% 42% at 18% 18%, rgba(56, 189, 248, .7), transparent 70%),
+    radial-gradient(36% 36% at 85% 25%, rgba(186, 230, 253, .55), transparent 70%),
+    radial-gradient(40% 40% at 50% 95%, rgba(14, 116, 144, .55), transparent 70%),
+    radial-gradient(30% 30% at 92% 85%, rgba(224, 242, 254, .5), transparent 70%);
+}
+.phone[data-weather="snow"] .wordmark {
+  background: linear-gradient(120deg, #fff 20%, #e0f2fe 60%, #38bdf8);
+  -webkit-background-clip: text; background-clip: text;
+}
+.phone[data-weather="snow"] .weatherPill {
+  border-color: rgba(56, 189, 248, .5); background: rgba(56, 189, 248, .15);
+  box-shadow: 0 0 16px rgba(56, 189, 248, .3);
+}
 @media (prefers-reduced-motion: reduce) {
   .phone::before, .vinyl, .page, .viewWrap, .homeTop, .sheet, .playerScreen, .mini, .searchModal, .onboard, .art img {
     animation: none !important;
@@ -108,9 +233,63 @@ h1, h2, p { margin: 0; }
 .crumbs { font-size: 11px; color: var(--sub); margin-top: 4px; }
 .clearAll { color: var(--yellow); font-weight: 600; font-size: 13px; }
 
-/* Home */
+/* Home & Weather */
+.homeWrapper { position: relative; width: 100%; min-height: 100%; }
+.weatherCanvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 0; border-radius: inherit;
+}
+.homeTop, .sheet { position: relative; z-index: 1; }
 .homeTop { padding: 28px 22px 16px; }
 .homeBar { display: flex; justify-content: space-between; align-items: center; }
+.homeBarRight { display: flex; align-items: center; gap: 8px; }
+
+.weatherWidget { position: relative; }
+.weatherPill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+  border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--fg);
+  background: var(--glass); border: 1px solid var(--stroke);
+  -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  transition: all .2s ease; cursor: pointer; white-space: nowrap;
+}
+.weatherPill:hover {
+  background: var(--glass-hi); border-color: rgba(255, 255, 255, .3);
+  transform: translateY(-1px);
+}
+.weatherIcon { font-size: 13px; line-height: 1; }
+.weatherLabel { font-size: 11px; font-weight: 600; }
+.weatherDot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--pink);
+  box-shadow: 0 0 6px var(--pink);
+}
+.weatherMenu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30;
+  width: 250px; padding: 12px; border-radius: 20px;
+  background: rgba(20, 16, 32, .92); border: 1px solid var(--stroke);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .6);
+  -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+  animation: miniSlideIn .2s ease both;
+}
+.weatherMenuTitle {
+  display: flex; flex-direction: column; gap: 2px;
+  padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--line);
+}
+.weatherMenuTitle strong { font-size: 12px; color: #fff; }
+.weatherMenuTitle small { font-size: 10px; color: var(--sub); }
+.weatherGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.weatherOpt {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border-radius: 12px; background: rgba(255, 255, 255, .05);
+  border: 1px solid var(--line); font-size: 11px; color: var(--sub);
+  transition: all .18s ease; cursor: pointer; text-align: left;
+}
+.weatherOpt:hover { background: rgba(255, 255, 255, .1); color: var(--fg); }
+.weatherOpt.active {
+  background: var(--accent); color: #fff; border-color: rgba(255, 95, 162, .5);
+  box-shadow: 0 4px 12px rgba(255, 95, 162, .3);
+}
+.weatherOpt span { font-size: 14px; flex: none; }
+.weatherOpt small { font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; }
 .logo { flex: none; border-radius: 12px; box-shadow: 0 6px 20px rgba(139, 108, 255, .5); }
 .wordmark { font-weight: 700; font-size: 20px; letter-spacing: -.02em; background: linear-gradient(120deg, #fff 20%, #ffb3d2 60%, var(--yellow)); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -320,7 +499,53 @@ kbd { font: inherit; font-size: 11px; font-weight: 600; padding: 3px 8px; border
 .menuItem:hover { background: var(--glass-hi); transform: translateX(3px); }
 .menuItem:active { transform: scale(0.985); }
 .menuItem strong { font-size: 15px; }
+.menuItem.staticItem { cursor: default; }
+.menuItem.staticItem:hover { background: transparent; transform: none; }
 .menuIcon { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; flex: none; box-shadow: 0 6px 18px rgba(139, 108, 255, .4); }
+.menuIcon.accentGrad {
+  background: linear-gradient(135deg, var(--violet), var(--pink));
+  color: #fff; box-shadow: 0 6px 20px rgba(255, 95, 162, .45);
+}
+.toggleSwitch {
+  position: relative; width: 50px; height: 30px; border-radius: 999px;
+  background: rgba(255, 255, 255, .15); border: 1px solid var(--stroke);
+  cursor: pointer; transition: background .25s ease, border-color .25s ease;
+  flex: none; padding: 2px;
+}
+.toggleSwitch.on {
+  background: var(--accent); border-color: rgba(255, 95, 162, .6);
+  box-shadow: 0 0 16px rgba(255, 95, 162, .45);
+}
+.toggleHandle {
+  display: block; width: 24px; height: 24px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
+  transition: transform .25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toggleSwitch.on .toggleHandle { transform: translateX(20px); }
+.crossfadeSettings {
+  margin: 0 16px 14px; padding: 14px 16px; border-radius: 18px;
+  background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
+}
+.crossfadeHeader {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; color: var(--sub); margin-bottom: 10px; font-weight: 500;
+}
+.crossfadeHeader strong { color: var(--pink); font-size: 13px; font-weight: 700; }
+.crossfadeButtons { display: flex; gap: 8px; flex-wrap: wrap; }
+.crossfadeBtn {
+  flex: 1; min-width: 44px; padding: 7px 10px; border-radius: 10px;
+  font-size: 12px; font-weight: 600; color: var(--sub);
+  background: rgba(255, 255, 255, .06); border: 1px solid var(--line);
+  transition: all .2s ease; cursor: pointer; text-align: center;
+}
+.crossfadeBtn:hover { color: var(--fg); border-color: rgba(255, 255, 255, .25); }
+.crossfadeBtn.active {
+  color: #fff; background: var(--accent); border-color: rgba(255, 95, 162, .6);
+  box-shadow: 0 4px 14px rgba(255, 95, 162, .35);
+}
+.miniAutomixBtn { transition: color .2s, transform .15s; }
+.miniAutomixBtn.on { color: var(--pink); }
+.miniAutomixBtn:hover { transform: scale(1.12); }
 
 /* Folders */
 .folders { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px 14px; padding: 0 22px; }
@@ -364,6 +589,40 @@ kbd { font: inherit; font-size: 11px; font-weight: 600; padding: 3px 8px; border
   }
 }
 .playerTop { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--sub); }
+.playerTopActions { display: flex; align-items: center; gap: 8px; }
+.automixPill {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; color: var(--sub); background: var(--glass);
+  border: 1px solid var(--stroke); -webkit-backdrop-filter: var(--blur); backdrop-filter: var(--blur);
+  transition: all .25s ease; cursor: pointer;
+}
+.automixPill:hover { color: var(--fg); border-color: rgba(255, 255, 255, .3); }
+.automixPill.active {
+  color: #fff; background: linear-gradient(135deg, rgba(139, 108, 255, .35), rgba(255, 95, 162, .35));
+  border-color: rgba(255, 95, 162, .6); box-shadow: 0 0 16px rgba(255, 95, 162, .25);
+}
+.automixDot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--pink);
+  box-shadow: 0 0 8px var(--pink); animation: pulseDot 1.8s infinite ease-in-out;
+}
+@keyframes pulseDot {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.25); }
+}
+.automixBanner {
+  display: flex; align-items: center; justify-content: center; gap: 10px; margin: -10px 0 18px;
+  padding: 8px 14px; border-radius: 12px; background: linear-gradient(135deg, rgba(139, 108, 255, .25), rgba(255, 95, 162, .25));
+  border: 1px solid rgba(255, 95, 162, .4); font-size: 11px; font-weight: 600; color: #fff;
+  animation: miniSlideIn .25s ease both;
+}
+.pulseWave { display: inline-flex; align-items: center; gap: 3px; height: 12px; }
+.pulseWave span {
+  width: 3px; height: 100%; border-radius: 2px; background: var(--pink);
+  animation: waveBounce 0.7s infinite ease-in-out alternate;
+}
+.pulseWave span:nth-child(2) { animation-delay: 0.2s; }
+.pulseWave span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes waveBounce { from { height: 3px; } to { height: 12px; } }
 .art { position: relative; height: 230px; margin: 34px 0 40px; }
 .art img {
   position: relative; width: 215px; height: 215px; object-fit: cover; border-radius: 18px; border: 1px solid var(--stroke); box-shadow: 0 24px 50px rgba(0, 0, 0, .55);
