@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { track as trackEvent } from '@vercel/analytics';
+import DetailView from './DetailView';
 
 // Used until the listener picks their own artists in onboarding.
 const DEFAULT_ARTISTS = [
@@ -38,6 +39,8 @@ const mapSong = item => ({
   album: decode(item.album?.name),
   albumId: item.album?.id,
   year: item.year,
+  duration: Number(item.duration) || 0,
+  artistImg: item.artists?.primary?.[0]?.image?.at(-1)?.url || '',
   language: item.language,
   label: decode(item.label),
   playCount: Number(item.playCount) || 0,
@@ -124,8 +127,10 @@ const mapAlbum = item => ({
   id: item.id,
   name: decode(item.name),
   year: item.year,
-  count: item.songCount,
+  count: item.songCount || 0,
+  songCount: item.songCount || 0,
   artist: decode(item.artists?.primary?.map(a => a.name).join(', ')),
+  artistImg: item.artists?.primary?.[0]?.image?.at(-1)?.url || '',
   img: item.image?.at(-1)?.url || ''
 });
 
@@ -241,7 +246,14 @@ const icons = {
   trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14',
   shuffle: 'M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5',
   repeat: 'M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3',
-  automix: 'M2 17h20M2 7h20M7 3v8M17 13v8M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'
+  automix: 'M2 17h20M2 7h20M7 3v8M17 13v8M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+  plus: 'M12 5v14M5 12h14',
+  clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
+  more: 'M12 13a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm7 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5 13a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z',
+  list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+  circlePlus: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z',
+  circleCheck: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5l-4-4 1.41-1.41L11 13.67l6.59-6.59L19 8.5l-8 8z',
+  circleDownload: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 10.59l2.29-2.29 1.42 1.41-4.71 4.71-4.71-4.71 1.42-1.41L11 12.59V6h2v6.59z'
 };
 
 function Icon({ name, fill = false, size = 22 }) {
@@ -298,6 +310,38 @@ function AlbumCard({ album, onOpen }) {
     <strong>{album.name}</strong>
     <small>{[album.year, album.artist].filter(Boolean).join(' · ')}</small>
   </button>;
+}
+
+function ShimmerCards({ count = 6 }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="album shimmerCard" aria-hidden="true">
+          <div className="shimmerImg shimmer" />
+          <div className="shimmerLine shimmer" style={{ width: `${Math.floor(65 + (i * 11) % 25)}%`, height: '14px', marginTop: '10px' }} />
+          <div className="shimmerLine shimmer" style={{ width: `${Math.floor(40 + (i * 7) % 25)}%`, height: '11px', marginTop: '6px' }} />
+        </div>
+      ))}
+    </>
+  );
+}
+
+function ShimmerTrackRows({ count = 6 }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="row shimmerRow" aria-hidden="true">
+          <div className="shimmerIndex shimmer" />
+          <div className="shimmerThumb shimmer" />
+          <div className="rowText">
+            <div className="shimmerLine shimmer" style={{ width: `${Math.floor(55 + (i * 13) % 35)}%`, height: '13px' }} />
+            <div className="shimmerLine shimmer" style={{ width: `${Math.floor(35 + (i * 9) % 30)}%`, height: '10px', marginTop: '5px' }} />
+          </div>
+          <div className="shimmerRight shimmer" />
+        </div>
+      ))}
+    </>
+  );
 }
 
 function AuthModal({ mode: initialMode, defaultName, onDone, onClose }) {
@@ -459,6 +503,7 @@ export default function Home() {
   const [collection, setCollection] = useState(null);
   const [tileArt, setTileArt] = useState({});
   const [album, setAlbum] = useState(null);
+  const [selectedSong, setSelectedSong] = useState(null);
   const [lyrics, setLyrics] = useState(null);
   const [currentTrack, setCurrentTrack] = useState(null);
   const [queue, setQueue] = useState([]);
@@ -1139,6 +1184,43 @@ export default function Home() {
     setDownloads(items => [entry, ...items.filter(item => keyOf(item) !== keyOf(entry))]);
   };
 
+  const toggleLikeTrack = track => {
+    if (!track) return;
+    const exists = liked.some(item => keyOf(item) === keyOf(track));
+    const { song, artist: by, img, id, url, album: albumName } = track;
+    setLiked(items => exists ? items.filter(item => keyOf(item) !== keyOf(track)) : [{ song, artist: by, img, id, url, album: albumName }, ...items]);
+    try { trackEvent('like_song', { song, artist: by }); } catch {}
+  };
+
+  const downloadTrack = async (track, event) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!track) return;
+    const trackUrl = track.url || (currentTrack && keyOf(currentTrack) === keyOf(track) ? streamRef.current : '');
+    if (!trackUrl) {
+      playTrack(track);
+      return;
+    }
+    const filename = `${track.song}.mp3`;
+    try {
+      const response = await fetch(trackUrl);
+      if (!response.ok) throw new Error('Download failed');
+      const objectUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      try { trackEvent('download_song', { song: track.song, artist: track.artist }); } catch {}
+    } catch {
+      window.open(trackUrl, '_blank');
+    }
+    const entry = { song: track.song, artist: track.artist, img: track.img || '', id: track.id, url: track.url, date: Date.now() };
+    setDownloads(items => [entry, ...items.filter(item => keyOf(item) !== keyOf(entry))]);
+  };
+
   const seek = event => {
     const value = Number(event.target.value);
     setProgress(value);
@@ -1208,7 +1290,7 @@ export default function Home() {
     }
   };
 
-  const libraryViews = ['library', 'history', 'artists', 'albums', 'artist', 'album', 'liked', 'downloads'];
+  const libraryViews = ['library', 'history', 'artists', 'albums', 'artist', 'album', 'song', 'liked', 'downloads', 'settings'];
   const tab = view === 'collection' ? 'search' : libraryViews.includes(view) ? 'library' : view;
   const goTab = target => target === 'home' ? goHome() : go(target);
   const initial = (user?.name || profile?.name || '?').trim().charAt(0).toUpperCase();
@@ -1224,9 +1306,39 @@ export default function Home() {
     go('album');
     try {
       const data = await api(`/albums?id=${a.id}`);
-      setAlbum(current => current?.id === a.id ? { ...current, songs: data.songs.map(mapSong).filter(item => item.url) } : current);
+      const songs = (data?.songs || []).map(mapSong).filter(item => item.url);
+      const artist = decode(data?.artists?.primary?.map(x => x.name).join(', ')) || a.artist;
+      const artistImg = data?.artists?.primary?.[0]?.image?.at(-1)?.url || a.artistImg || '';
+      setAlbum(current => current?.id === a.id ? {
+        ...current,
+        ...data,
+        name: decode(data?.name) || current.name,
+        artist,
+        artistImg,
+        img: data?.image?.at(-1)?.url || current.img,
+        year: data?.year || current.year,
+        songCount: data?.songCount || songs.length,
+        songs
+      } : current);
     } catch {
       setAlbum(current => current?.id === a.id ? { ...current, songs: [] } : current);
+    }
+  };
+
+  const openSong = async s => {
+    setSelectedSong(s);
+    go('song');
+    if (s.albumId) {
+      try {
+        const data = await api(`/albums?id=${s.albumId}`);
+        const songs = (data?.songs || []).map(mapSong).filter(item => item.url);
+        setSelectedSong(current => current?.id === s.id ? {
+          ...current,
+          albumSongs: songs,
+          artistImg: data?.artists?.primary?.[0]?.image?.at(-1)?.url || current.artistImg,
+          year: data?.year || current.year
+        } : current);
+      } catch {}
     }
   };
 
@@ -1242,6 +1354,7 @@ export default function Home() {
     ['Albums', `${allAlbumsCount} Albums`, 'album', 'albums'],
     ['Liked Songs', `${liked.length} Songs`, 'heart', 'liked'],
     ['Downloads', `${downloads.length} Songs`, 'download', 'downloads'],
+    ['Settings', user ? user.email : 'Account & audio preferences', 'settings', 'settings'],
     ['Your taste', tasteSummary, 'user', 'taste']
   ];
   const openItem = target => target === 'taste' ? setEditingTaste(true) : go(target);
@@ -1339,7 +1452,7 @@ export default function Home() {
                     <strong>{item.song}</strong>
                     <small>{item.artist}</small>
                   </button>)}
-                  {!newSongs.length && <div className="empty">Loading new songs…</div>}
+                  {!newSongs.length && <ShimmerCards count={7} />}
                 </div>
 
                 {trending.length > 0 && <>
@@ -1363,7 +1476,7 @@ export default function Home() {
                 <div className="sectionHead"><h2>Latest releases</h2><button onClick={() => go('albums')}>Show all</button></div>
                 <div className="albums scrollRow">
                   {latest.slice(0, 12).map(item => <AlbumCard key={item.id} album={item} onOpen={openAlbum} />)}
-                  {!latest.length && <div className="empty">Loading albums…</div>}
+                  {!latest.length && <ShimmerCards count={7} />}
                 </div>
 
                 <div className="sectionHead"><h2>Artists</h2></div>
@@ -1378,7 +1491,7 @@ export default function Home() {
                 <div className="sectionHead"><h2>Top songs</h2><button onClick={() => go('artists')}>Show all</button></div>
                 <div className="list">
                   {topSongs.map(item => <TrackRow key={item.id} track={item} active={isCurrent(item)} sub={`${item.artist} · ${item.album}`} right={item.year} onPlay={() => playTrack(item)} />)}
-                  {!topSongs.length && <div className="empty">Loading songs…</div>}
+                  {!topSongs.length && <ShimmerTrackRows count={6} />}
                 </div>
             </section>
           </div>}
@@ -1418,7 +1531,7 @@ export default function Home() {
             </div>
             <div className="tracks">
               <div className="list plain">
-                {!collection.songs && <div className="empty">Loading songs…</div>}
+                {!collection.songs && <ShimmerTrackRows count={8} />}
                 {collection.songs?.length === 0 && <div className="empty">{collection.id === 'foryou' ? 'Play a few songs and your mix appears here.' : 'Nothing here yet.'}</div>}
                 {collection.songs?.map((item, index) => <TrackRow key={item.id} track={item} index={index + 1} active={isCurrent(item)} onPlay={() => playTrack(item, collection.songs)} />)}
               </div>
@@ -1560,29 +1673,49 @@ export default function Home() {
             </div>
           </section>}
 
-          {view === 'album' && album && <section key={`album-${album?.id || 'curr'}`} className="page">
-            <div className="headerBar pad">
-              <button className="iconBtn" onClick={back} aria-label="Back"><Icon name="back" /></button>
-              <span className="iconBtn"><Icon name="grid" fill size={18} /></span>
-            </div>
-            <div className="artistHero">
-              <img className="square" src={album.img} alt="" />
-              <div>
-                <small className="eyebrow">Album · {album.year}</small>
-                <h1>{album.name}</h1>
-                <p>{album.artist}{album.songs ? ` · ${album.songs.length} songs` : ''}</p>
-                <button className="playAll" onClick={() => album.songs?.[0] && playTrack(album.songs[0], album.songs)}><Icon name="play" fill size={16} />Play</button>
-              </div>
-            </div>
-            <div className="tracks">
-              <div className="sectionHead"><h2>Tracks</h2></div>
-              <div className="list plain">
-                {!album.songs && <div className="empty">Loading tracks…</div>}
-                {album.songs?.length === 0 && <div className="empty">No playable tracks in this album.</div>}
-                {album.songs?.map((item, index) => <TrackRow key={item.id} track={item} index={index + 1} active={isCurrent(item)} onPlay={() => playTrack(item, album.songs)} />)}
-              </div>
-            </div>
-          </section>}
+          {view === 'album' && album && (
+            <DetailView
+              type="album"
+              item={album}
+              onBack={back}
+              isPlaying={isPlaying}
+              currentTrack={currentTrack}
+              keyOf={keyOf}
+              playTrack={playTrack}
+              togglePlay={togglePlay}
+              shuffle={shuffle}
+              setShuffle={setShuffle}
+              liked={liked}
+              toggleLikeTrack={toggleLikeTrack}
+              downloadTrack={downloadTrack}
+              openArtist={openArtist}
+              openAlbum={openAlbum}
+              openSong={openSong}
+              Icon={Icon}
+            />
+          )}
+
+          {view === 'song' && selectedSong && (
+            <DetailView
+              type="song"
+              item={selectedSong}
+              onBack={back}
+              isPlaying={isPlaying}
+              currentTrack={currentTrack}
+              keyOf={keyOf}
+              playTrack={playTrack}
+              togglePlay={togglePlay}
+              shuffle={shuffle}
+              setShuffle={setShuffle}
+              liked={liked}
+              toggleLikeTrack={toggleLikeTrack}
+              downloadTrack={downloadTrack}
+              openArtist={openArtist}
+              openAlbum={openAlbum}
+              openSong={openSong}
+              Icon={Icon}
+            />
+          )}
 
           {view === 'liked' && <section key="liked" className="page">
             <Header title="Liked Songs" crumbs={['Home', 'Library', 'Liked']} onBack={back} />
@@ -1624,7 +1757,22 @@ export default function Home() {
               </div>
             )}
             <div className="trackInfo">
-              <div><h2>{currentTrack.song}</h2><p>{status || currentTrack.artist}</p></div>
+              <div>
+                <h2
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => openSong(currentTrack)}
+                  title="View song details"
+                >
+                  {currentTrack.song}
+                </h2>
+                <p
+                  style={{ cursor: currentTrack.albumId ? 'pointer' : 'default' }}
+                  onClick={() => currentTrack.albumId && openAlbum({ id: currentTrack.albumId, name: currentTrack.album, img: currentTrack.img, artist: currentTrack.artist })}
+                  title={currentTrack.album ? `View album: ${currentTrack.album}` : ''}
+                >
+                  {status || currentTrack.artist}
+                </p>
+              </div>
               <button onClick={toggleLike} className={`likeBtn ${isLiked ? 'on' : ''}`} aria-label="Like"><Icon name="heart" fill={isLiked} size={26} /></button>
             </div>
             <input className="progress" type="range" min="0" max="100" value={progress} onChange={seek} style={{ '--p': `${progress}%` }} aria-label="Seek" />
@@ -1673,6 +1821,24 @@ export default function Home() {
               <img src={currentTrack.img} alt="" />
               <span className="rowText"><small>{status || currentTrack.artist}</small><strong>{currentTrack.song}</strong></span>
             </button>
+            <div className="miniMobileRight">
+              <button
+                type="button"
+                className={`miniMobileHeart ${isLiked ? 'on' : ''}`}
+                onClick={(e) => { e.stopPropagation(); toggleLike(); }}
+                aria-label="Like"
+              >
+                <Icon name="heart" fill={isLiked} size={20} />
+              </button>
+              <button
+                type="button"
+                className="miniMobilePlay"
+                onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+              >
+                <Icon name={isPlaying ? 'pause' : 'play'} fill size={22} />
+              </button>
+            </div>
             <div className="miniCenter">
               <div className="miniControls">
                 <button className="deskOnly" onClick={() => step(-1)} aria-label="Previous"><Icon name="prev" fill size={18} /></button>
@@ -1699,10 +1865,29 @@ export default function Home() {
               <button onClick={toggleLike} className={isLiked ? 'on' : ''} aria-label="Like"><Icon name="heart" fill={isLiked} size={18} /></button>
               <button type="button" onClick={downloadCurrent} aria-label="Download"><Icon name="download" size={18} /></button>
             </div>
+            <div className="miniBottomBar">
+              <div className="miniBottomFill" style={{ width: `${progress}%` }} />
+            </div>
           </div>}
           <nav className="nav" aria-label="Main">
-            {[['home', 'Home', 'home'], ['search', 'Search', 'search'], ['library', 'My Library', 'library'], ['settings', 'Settings', 'settings']].map(([id, label, icon]) =>
-              <button key={id} className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => goTab(id)}><Icon name={icon} /><span>{label}</span></button>)}
+            {[
+              ['home', 'Home', 'home'],
+              ['search', 'Search', 'search'],
+              ['library', 'Your Library', 'library']
+            ].map(([id, label, icon]) => {
+              const active = tab === id;
+              return (
+                <button
+                  key={id}
+                  className={active ? 'active' : ''}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => goTab(id)}
+                >
+                  <Icon name={icon} fill={active} size={24} />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
           </nav>
         </div>
 
@@ -1786,7 +1971,7 @@ export default function Home() {
                   </div>
                 </>}
 
-                {searching && <div className="empty">Searching…</div>}
+                {searching && <ShimmerTrackRows count={6} />}
                 {!searching && !artistHits.length && !results.songs.length && !results.albums.length && <div className="empty">No results for “{query}”.</div>}
               </>}
             </div>

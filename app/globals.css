@@ -493,42 +493,193 @@ kbd { font: inherit; font-size: 11px; font-weight: 600; padding: 3px 8px; border
 .lyrics .lyricLines p.past { color: rgba(255, 255, 255, .55); }
 .lyrics .lyricLines p.on { color: #fff; transform: scale(1.04); text-shadow: 0 0 18px rgba(255, 95, 162, .6); }
 
-/* Dock: floating glass mini player + nav */
-.dock { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 10; display: flex; flex-direction: column; gap: 10px; }
+/* Dock: Spotify mobile dock (mini player card + bottom nav bar) */
+.dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+/* Hide bottom dock when full player screen is open on mobile */
+.phone:has(.playerScreen) .dock,
+.phone:has(.playerScreen) .nav {
+  display: none !important;
+}
+
+/* Mini Player - Spotify Mobile Floating Card */
 .mini {
-  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 22px; background: rgba(20, 16, 34, .78);
-  animation: miniSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin: 0 8px 8px 8px;
+  border-radius: 8px;
+  background: #242424;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+  overflow: hidden;
+  animation: miniSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: opacity, transform;
 }
-@keyframes miniSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
 .mini.onPlayer, .miniProgress, .miniActions, .deskOnly { display: none; }
-.miniInfo { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; text-align: left; }
-.mini img { width: 44px; height: 44px; border-radius: 12px; object-fit: cover; flex: none; background: var(--accent); }
-.mini small { color: var(--sub); }
-.miniPlay { position: relative; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--glass); }
-.miniPlay::before {
-  content: ''; position: absolute; inset: 0; border-radius: 50%;
-  background: conic-gradient(var(--pink) var(--p), rgba(255, 255, 255, .15) 0);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+.miniInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
 }
-.nav { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); padding: 8px; border-radius: 28px; background: rgba(20, 16, 34, .78); color: var(--sub); }
+.mini img {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex: none;
+  background: #333;
+}
+.mini .rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mini .rowText strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini .rowText small {
+  font-size: 11px;
+  font-weight: 400;
+  color: #b3b3b3;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.miniMobileRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+.miniMobileHeart {
+  background: transparent;
+  border: 0;
+  color: #b3b3b3;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+.miniMobileHeart.on {
+  color: #1ed760;
+}
+.miniMobileHeart:active {
+  transform: scale(0.88);
+}
+.miniMobilePlay {
+  background: transparent;
+  border: 0;
+  color: #ffffff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  transition: transform 0.1s ease;
+}
+.miniMobilePlay:active {
+  transform: scale(0.88);
+}
+.miniBottomBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.2);
+}
+.miniBottomFill {
+  height: 100%;
+  background: #ffffff;
+  border-radius: 2px;
+  transition: width 0.15s linear;
+}
+
+/* Navigation Bar - Spotify Mobile Exact Replica */
+.nav {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: center;
+  justify-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 8px 0 max(env(safe-area-inset-bottom, 0px), 10px) 0;
+  border-radius: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(18, 18, 18, 0.96) 20%, #121212 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  pointer-events: auto;
+  box-shadow: none;
+}
 .nav > button {
-  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0; border-radius: 20px; font-size: 11px; font-weight: 600;
-  transition: color .2s, background .2s, transform 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: #b3b3b3;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: color 0.15s ease, transform 0.1s ease;
+  cursor: pointer;
 }
-.nav > button:active { transform: scale(0.92); }
-.nav > button.active { color: var(--fg); background: rgba(255, 255, 255, .08); }
-.nav > button.active svg { color: var(--pink); }
+.nav > button svg {
+  color: inherit;
+  transition: transform 0.15s ease;
+}
+.nav > button:active {
+  transform: scale(0.94);
+}
+.nav > button:hover {
+  color: #ffffff;
+}
+.nav > button.active {
+  color: #ffffff;
+  background: transparent;
+  font-weight: 700;
+}
+.nav > button.active svg {
+  color: #ffffff;
+  stroke-width: 2.4;
+}
 
 /* Website layout */
 @media (min-width: 900px) {
@@ -633,9 +784,10 @@ kbd { font: inherit; font-size: 11px; font-weight: 600; padding: 3px 8px; border
   .playerSide .lyrics { margin-top: 16px; }
   .playerSide .lyricLines { max-height: calc(100dvh - 360px); }
 
-  .dock { position: static; grid-column: 1 / -1; }
-  .nav { display: none; }
-  .mini, .mini.onPlayer { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 24px; padding: 12px 20px; border-radius: 20px; }
+  .dock { position: static; grid-column: 1 / -1; pointer-events: auto; }
+  .nav { display: none !important; }
+  .miniMobileRight, .miniBottomBar { display: none !important; }
+  .mini, .mini.onPlayer { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 24px; padding: 12px 20px; border-radius: 20px; margin: 0; background: rgba(20, 16, 34, .78); }
   .miniCenter { display: flex; flex-direction: column; align-items: center; gap: 4px; }
   .miniControls { display: flex; align-items: center; gap: 18px; }
   .miniControls .deskOnly { display: grid; place-items: center; width: 32px; height: 32px; }
@@ -649,3 +801,652 @@ kbd { font: inherit; font-size: 11px; font-weight: 600; padding: 3px 8px; border
   .lyricLines { max-height: 420px; }
   .lyricLines p { font-size: 22px; }
 }
+
+/* ==========================================================================
+   Spotify-style Album & Song Details Page with Dynamic Cover Gradient
+   ========================================================================== */
+
+.detailPage {
+  position: relative;
+  min-height: 100%;
+  color: #ffffff;
+  padding-bottom: 60px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--detail-r, 42), var(--detail-g, 68), var(--detail-b, 86), 0.88) 0px,
+    rgba(var(--detail-r, 42), var(--detail-g, 68), var(--detail-b, 86), 0.42) 280px,
+    rgba(18, 18, 20, 0.96) 480px,
+    #121214 100%
+  );
+  transition: background 0.4s ease;
+}
+
+.detailBackBar {
+  padding: 16px 28px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 10;
+}
+
+.detailBackBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.2s ease, transform 0.15s ease;
+  cursor: pointer;
+}
+
+.detailBackBtn:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.05);
+}
+
+.detailHero {
+  display: flex;
+  align-items: flex-end;
+  gap: 28px;
+  padding: 16px 28px 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.detailCoverWrapper {
+  flex: none;
+  position: relative;
+}
+
+.detailCover {
+  width: 232px;
+  height: 232px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.detailInfo {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-width: 0;
+  flex: 1;
+  gap: 6px;
+}
+
+.detailEyebrow {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 2px;
+}
+
+.detailTitle {
+  font-size: clamp(32px, 5.2vw, 76px);
+  font-weight: 900;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+  color: #ffffff;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+.detailMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 10px;
+}
+
+.detailMetaAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.2);
+  flex: none;
+}
+
+.detailMetaAvatarPlaceholder {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  flex: none;
+}
+
+.detailArtistName {
+  font-weight: 700;
+  color: #ffffff;
+  cursor: pointer;
+  transition: text-decoration 0.15s;
+}
+
+.detailArtistName:hover {
+  text-decoration: underline;
+}
+
+.detailBullet {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+}
+
+.detailSubInfo {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+/* Action Bar */
+.detailActionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 28px 24px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.2) 0%, transparent 100%);
+  position: relative;
+  z-index: 2;
+}
+
+.detailActionsLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.detailPlayBtn {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #1ed760;
+  color: #000000;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 24px rgba(30, 215, 96, 0.35);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.detailPlayBtn:hover {
+  background: #1fdf64;
+  transform: scale(1.05);
+  box-shadow: 0 10px 28px rgba(30, 215, 96, 0.5);
+}
+
+.detailPlayBtn:active {
+  transform: scale(0.96);
+}
+
+.detailThumbnailBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.detailThumbnailBtn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.detailThumbnailBtn:hover {
+  transform: scale(1.06);
+  border-color: #ffffff;
+}
+
+.detailIconBtn {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: transparent;
+  color: #b3b3b3;
+  transition: color 0.18s ease, transform 0.15s ease;
+  cursor: pointer;
+}
+
+.detailIconBtn:hover {
+  color: #ffffff;
+  transform: scale(1.08);
+}
+
+.detailIconBtn.active {
+  color: #1ed760;
+}
+
+.detailActionsRight {
+  display: flex;
+  align-items: center;
+}
+
+.detailListBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #b3b3b3;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: color 0.15s ease;
+}
+
+.detailListBadge:hover {
+  color: #ffffff;
+}
+
+/* Track Table */
+.detailTracksTable {
+  padding: 0 28px 48px;
+}
+
+.detailTableHeader {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto 64px;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #b3b3b3;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.detailTableHeader .colIndex {
+  text-align: center;
+}
+
+.detailTableHeader .colTitle {
+  padding-left: 4px;
+}
+
+.detailTableHeader .colDuration {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.detailTrackRow {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto 64px;
+  align-items: center;
+  height: 56px;
+  padding: 0 16px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.detailTrackRow:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.detailTrackRow.active {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.detailColIndex {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #b3b3b3;
+  width: 32px;
+}
+
+.detailTrackRow.active .detailColIndex {
+  color: #1ed760;
+}
+
+.detailTrackRow .trackNum {
+  display: block;
+}
+
+.detailTrackRow .trackPlayIcon {
+  display: none;
+  color: #ffffff;
+}
+
+.detailTrackRow:hover .trackNum {
+  display: none;
+}
+
+.detailTrackRow:hover .trackPlayIcon {
+  display: block;
+}
+
+.detailColTitle {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding-left: 4px;
+}
+
+.detailSongName {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.detailTrackRow.active .detailSongName {
+  color: #1ed760;
+}
+
+.detailArtistSubtitle {
+  font-size: 13px;
+  font-weight: 400;
+  color: #b3b3b3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.detailTrackRow:hover .detailArtistSubtitle {
+  color: #ffffff;
+}
+
+.detailColActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.detailTrackRow:hover .detailColActions {
+  opacity: 1;
+}
+
+.detailRowActionBtn {
+  background: transparent;
+  border: 0;
+  color: #b3b3b3;
+  cursor: pointer;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.detailRowActionBtn:hover {
+  color: #ffffff;
+  transform: scale(1.15);
+}
+
+.detailRowActionBtn.liked {
+  color: #1ed760;
+  opacity: 1;
+}
+
+.detailColDuration {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 400;
+  color: #b3b3b3;
+}
+
+/* Audio wave equalizer animation for active playing row */
+.detailEqualizer {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+  width: 14px;
+}
+
+.detailEqualizer span {
+  width: 3px;
+  background: #1ed760;
+  border-radius: 1px;
+  animation: eqBounce 1.2s infinite ease-in-out;
+}
+
+.detailEqualizer span:nth-child(1) { height: 60%; animation-delay: 0.1s; }
+.detailEqualizer span:nth-child(2) { height: 100%; animation-delay: 0.3s; }
+.detailEqualizer span:nth-child(3) { height: 40%; animation-delay: 0.2s; }
+
+@keyframes eqBounce {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+/* Song View specific sections */
+.detailSectionTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 32px 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.detailAlbumCardLink {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 24px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.detailAlbumCardLink:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.detailAlbumCardLink img {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.detailAlbumCardLink strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.detailAlbumCardLink small {
+  font-size: 13px;
+  color: #b3b3b3;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .detailHero {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 12px 18px 20px;
+    gap: 18px;
+  }
+
+  .detailCover {
+    width: 180px;
+    height: 180px;
+  }
+
+  .detailInfo {
+    align-items: center;
+  }
+
+  .detailTitle {
+    font-size: 28px;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .detailMeta {
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  .detailActionBar {
+    padding: 16px 18px 20px;
+  }
+
+  .detailActionsLeft {
+    gap: 14px;
+  }
+
+  .detailTracksTable {
+    padding: 0 12px 40px;
+  }
+
+  .detailTableHeader,
+  .detailTrackRow {
+    grid-template-columns: 32px minmax(0, 1fr) 52px;
+    padding: 0 8px;
+  }
+
+  .detailTableHeader .colActions,
+  .detailColActions {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   Shimmer Skeleton Cards & Rows
+   ========================================================================== */
+
+@keyframes shimmerWave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerWave 1.8s infinite ease-in-out;
+  border-radius: 6px;
+}
+
+.shimmerCard {
+  pointer-events: none;
+  cursor: default;
+}
+.shimmerCard:hover, .shimmerCard:active {
+  transform: none !important;
+}
+
+.shimmerCard .shimmerImg {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+}
+
+.shimmerCard .shimmerLine {
+  border-radius: 4px;
+}
+
+.shimmerRow {
+  pointer-events: none;
+  cursor: default;
+  border-bottom: 1px solid var(--line);
+}
+.shimmerRow:hover, .shimmerRow:active {
+  background: transparent !important;
+  transform: none !important;
+}
+
+.shimmerRow .shimmerIndex {
+  width: 18px;
+  height: 14px;
+  border-radius: 4px;
+  flex: none;
+}
+
+.shimmerRow .shimmerThumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  flex: none;
+}
+
+.shimmerRow .shimmerRight {
+  width: 36px;
+  height: 14px;
+  border-radius: 4px;
+  flex: none;
+}
+
+.shimmerDetailRow {
+  pointer-events: none;
+  cursor: default;
+}
+.shimmerDetailRow:hover {
+  background: transparent !important;
+}
+
+.shimmerDetailRow .shimmerIndex {
+  width: 16px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.shimmerDetailRow .shimmerDuration {
+  width: 34px;
+  height: 14px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
