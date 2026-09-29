@@ -623,7 +623,15 @@ kbd { font: inherit; font-size: 11px; font-weight: 600; padding: 3px 8px; border
   .artistHero h1 { font-size: 56px; }
   .tracks { margin: 0 32px; padding: 24px; }
 
-  .playerScreen { max-width: 520px; margin: 0 auto; padding: 40px 26px; }
+  .playerScreen { max-width: 1200px; margin: 0 auto; padding: 28px 48px; display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); gap: 0 56px; align-items: start; }
+  .playerTop { grid-column: 1 / -1; }
+  .playerMain { position: sticky; top: 24px; }
+  .playerScreen .art { margin: 20px 0 24px; }
+  .playerScreen .art img { width: min(100%, 50vh); margin: 0 auto; }
+  .playerSide { padding-top: 20px; }
+  .playerSide .upNext .sectionHead { margin-top: 0; }
+  .playerSide .lyrics { margin-top: 16px; }
+  .playerSide .lyricLines { max-height: calc(100dvh - 360px); }
 
   .dock { position: static; grid-column: 1 / -1; }
   .nav { display: none; }

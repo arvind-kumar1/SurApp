@@ -1611,9 +1611,10 @@ export default function Home() {
           {view === 'player' && currentTrack && <section key={`player-${currentTrack.id}`} className="playerScreen">
             <div className="playerTop">
               <button type="button" className="iconBtn" onClick={closePlayer} aria-label="Close player"><Icon name="down" size={26} /></button>
-              <strong>{currentTrack.album || 'Now playing'}</strong>
+              <span />
               <button type="button" className="iconBtn" onClick={downloadCurrent} aria-label="Download"><Icon name="download" /></button>
             </div>
+            <div className="playerMain">
             <div className="art"><img src={currentTrack.img} alt="" /></div>
             {isMixing && (
               <div className="automixBanner">
@@ -1651,6 +1652,8 @@ export default function Home() {
                 {automix && <span className="automixDot" />}
               </button>
             </div>
+            </div>
+            <div className="playerSide">
             {upNext && <div className="upNext">
               <div className="sectionHead"><h2>Up next</h2><span>{queueMode === 'radio' ? 'Similar vibe' : 'In order'}</span></div>
               <TrackRow track={upNext} right={<Icon name="next" fill size={16} />} onPlay={() => step(1)} />
@@ -1662,6 +1665,7 @@ export default function Home() {
               {lyrics?.lines.length > 0 && <div className="lyricLines" ref={lyricsRef}>
                 {lyrics.lines.map((line, index) => <p key={index} className={index === activeLine ? 'on' : index < activeLine ? 'past' : ''} onClick={() => seekTo(line.t)}>{line.text || ' '}</p>)}
               </div>}
+            </div>
             </div>
           </section>}
         </div>
