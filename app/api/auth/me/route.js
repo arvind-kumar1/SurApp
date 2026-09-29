@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { ObjectId } from 'mongodb';
 import { getDb } from '@/lib/mongodb';
+import { rateLimit } from '@/lib/rateLimit';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const limited = await rateLimit(request, 'me', 60, 60);
+    if (limited) return limited;
+
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value;
 

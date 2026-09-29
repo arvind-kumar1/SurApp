@@ -187,14 +187,24 @@ async function searchAll(q, names, signal) {
 
 const searchTabs = [['all', 'All'], ['songs', 'Songs'], ['albums', 'Albums'], ['artists', 'Artists']];
 
-async function itunesPreview(track) {
+// Same song replayed = no new request.
+const memo = fn => {
+  const cache = new Map();
+  return track => {
+    const key = `${track.song}|${track.artist}`;
+    if (!cache.has(key)) cache.set(key, fn(track).catch(error => { cache.delete(key); throw error; }));
+    return cache.get(key);
+  };
+};
+
+const itunesPreview = memo(async track => {
   const response = await fetch(`https://itunes.apple.com/search?entity=song&limit=5&term=${encodeURIComponent(`${track.song} ${track.artist}`)}`);
   if (!response.ok) return null;
   const data = await response.json();
   return data.results?.find(item => item.previewUrl && sameTitle(item.trackName, track.song)) || null;
-}
+});
 
-async function fetchLyrics(track) {
+const fetchLyrics = memo(async track => {
   const artist = track.artist.split(',')[0].trim();
   const response = await fetch(`https://lrclib.net/api/search?track_name=${encodeURIComponent(track.song)}&artist_name=${encodeURIComponent(artist)}`);
   if (!response.ok) return { lines: [] };
@@ -208,7 +218,7 @@ async function fetchLyrics(track) {
     return { lines, synced: true };
   }
   return { lines: (hit?.plainLyrics || '').split('\n').map(text => ({ t: null, text })) };
-}
+});
 
 const icons = {
   back: 'M19 12H5M12 19l-7-7 7-7',
@@ -232,6 +242,8 @@ const icons = {
   settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14',
+  shuffle: 'M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5',
+  repeat: 'M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3',
   automix: 'M2 17h20M2 7h20M7 3v8M17 13v8M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z'
 };
 
@@ -250,251 +262,6 @@ function updateFavicon(url) {
     link.href = url;
     document.head.appendChild(link);
   } catch {}
-}
-
-function WeatherCanvas({ effect }) {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !effect || effect === 'none') return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animId;
-    let width = (canvas.width = canvas.parentElement?.offsetWidth || window.innerWidth);
-    let height = (canvas.height = canvas.parentElement?.offsetHeight || window.innerHeight);
-
-    const handleResize = () => {
-      if (!canvas || !canvas.parentElement) return;
-      width = canvas.width = canvas.parentElement.offsetWidth;
-      height = canvas.height = canvas.parentElement.offsetHeight;
-    };
-    window.addEventListener('resize', handleResize);
-
-    // Rain particles
-    const rainDrops = Array.from({ length: 75 }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      len: 16 + Math.random() * 20,
-      speed: 12 + Math.random() * 10,
-      alpha: 0.15 + Math.random() * 0.35,
-      slant: -1.5 + Math.random() * 3
-    }));
-
-    // Cloudy mist puffs
-    const cloudPuffs = Array.from({ length: 7 }, (_, i) => ({
-      x: (i / 7) * width + Math.random() * 120,
-      y: 60 + Math.random() * Math.min(height * 0.6, 380),
-      radius: 120 + Math.random() * 160,
-      speed: 0.15 + Math.random() * 0.25,
-      alpha: 0.035 + Math.random() * 0.045
-    }));
-
-    // Sunny shimmer motes
-    const motes = Array.from({ length: 35 }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      r: 1.5 + Math.random() * 2.5,
-      vx: (Math.random() - 0.5) * 0.4,
-      vy: -0.2 - Math.random() * 0.5,
-      alpha: 0.2 + Math.random() * 0.5,
-      baseAlpha: 0.2 + Math.random() * 0.5,
-      pulse: Math.random() * Math.PI * 2
-    }));
-
-    // Snow flakes
-    const flakes = Array.from({ length: 55 }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      r: 1.5 + Math.random() * 3,
-      speed: 1 + Math.random() * 2,
-      drift: Math.random() * Math.PI * 2,
-      alpha: 0.25 + Math.random() * 0.5
-    }));
-
-    let lightningTimer = 0;
-    let lightningFlash = 0;
-    let tick = 0;
-
-    const render = () => {
-      tick++;
-      ctx.clearRect(0, 0, width, height);
-
-      if (effect === 'rain' || effect === 'storm') {
-        ctx.lineWidth = 1.2;
-        ctx.lineCap = 'round';
-        for (const drop of rainDrops) {
-          ctx.strokeStyle = `rgba(170, 205, 255, ${drop.alpha})`;
-          ctx.beginPath();
-          ctx.moveTo(drop.x, drop.y);
-          ctx.lineTo(drop.x + drop.slant, drop.y + drop.len);
-          ctx.stroke();
-
-          drop.y += drop.speed;
-          drop.x += drop.slant * 0.3;
-          if (drop.y > height) {
-            drop.y = -drop.len;
-            drop.x = Math.random() * width;
-          }
-        }
-
-        if (effect === 'storm') {
-          lightningTimer++;
-          if (lightningTimer > 220 && Math.random() < 0.02) {
-            lightningFlash = 1;
-            lightningTimer = 0;
-          }
-          if (lightningFlash > 0) {
-            ctx.fillStyle = `rgba(235, 242, 255, ${lightningFlash * 0.16})`;
-            ctx.fillRect(0, 0, width, height);
-            lightningFlash -= 0.08;
-          }
-        }
-      } else if (effect === 'cloudy') {
-        for (const c of cloudPuffs) {
-          const grad = ctx.createRadialGradient(c.x, c.y, c.radius * 0.15, c.x, c.y, c.radius);
-          grad.addColorStop(0, `rgba(180, 195, 235, ${c.alpha * 1.4})`);
-          grad.addColorStop(0.6, `rgba(140, 160, 210, ${c.alpha * 0.7})`);
-          grad.addColorStop(1, 'rgba(100, 120, 170, 0)');
-          ctx.fillStyle = grad;
-          ctx.beginPath();
-          ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
-          ctx.fill();
-
-          c.x += c.speed;
-          if (c.x - c.radius > width) {
-            c.x = -c.radius;
-            c.y = 40 + Math.random() * Math.min(height * 0.6, 380);
-          }
-        }
-      } else if (effect === 'sunny') {
-        const sunX = width * 0.85;
-        const sunY = 40;
-        const sunGrad = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, Math.min(width, 600));
-        sunGrad.addColorStop(0, 'rgba(255, 205, 110, 0.14)');
-        sunGrad.addColorStop(0.4, 'rgba(255, 140, 60, 0.07)');
-        sunGrad.addColorStop(1, 'rgba(255, 120, 50, 0)');
-        ctx.fillStyle = sunGrad;
-        ctx.fillRect(0, 0, width, height);
-
-        const rayAngle = Math.sin(tick * 0.005) * 0.18 + 0.85;
-        ctx.save();
-        ctx.translate(sunX, sunY);
-        ctx.rotate(rayAngle);
-        const rayGrad = ctx.createLinearGradient(0, 0, 0, height);
-        rayGrad.addColorStop(0, 'rgba(255, 230, 150, 0.07)');
-        rayGrad.addColorStop(0.5, 'rgba(255, 190, 100, 0.025)');
-        rayGrad.addColorStop(1, 'rgba(255, 170, 80, 0)');
-        ctx.fillStyle = rayGrad;
-        ctx.beginPath();
-        ctx.moveTo(-90, 0);
-        ctx.lineTo(90, 0);
-        ctx.lineTo(260, height * 1.2);
-        ctx.lineTo(-260, height * 1.2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-
-        for (const m of motes) {
-          m.pulse += 0.03;
-          const a = m.baseAlpha * (0.6 + 0.4 * Math.sin(m.pulse));
-          ctx.fillStyle = `rgba(255, 225, 140, ${a})`;
-          ctx.beginPath();
-          ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2);
-          ctx.fill();
-
-          m.x += m.vx;
-          m.y += m.vy;
-          if (m.y < -10) m.y = height + 10;
-          if (m.x < 0) m.x = width;
-          if (m.x > width) m.x = 0;
-        }
-      } else if (effect === 'snow') {
-        for (const f of flakes) {
-          f.drift += 0.02;
-          ctx.fillStyle = `rgba(255, 255, 255, ${f.alpha})`;
-          ctx.beginPath();
-          ctx.arc(f.x + Math.sin(f.drift) * 1.5, f.y, f.r, 0, Math.PI * 2);
-          ctx.fill();
-
-          f.y += f.speed;
-          f.x += Math.cos(f.drift) * 0.5;
-          if (f.y > height) {
-            f.y = -f.r;
-            f.x = Math.random() * width;
-          }
-        }
-      }
-
-      animId = requestAnimationFrame(render);
-    };
-
-    animId = requestAnimationFrame(render);
-
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [effect]);
-
-  if (!effect || effect === 'none') return null;
-
-  return <canvas ref={canvasRef} className="weatherCanvas" aria-hidden="true" />;
-}
-
-function WeatherWidget({ weatherState, weatherMode, onChangeMode, open, onToggleOpen }) {
-  const currentIcon = weatherMode === 'auto' ? weatherState.icon : (
-    { rain: '🌧️', cloudy: '☁️', sunny: '☀️', storm: '⚡', snow: '❄️', none: '🚫' }[weatherMode] || '☀️'
-  );
-  const currentLabel = weatherMode === 'auto' ? `${weatherState.label}${weatherState.temp != null ? ` · ${Math.round(weatherState.temp)}°` : ''}` : (
-    { rain: 'Raining', cloudy: 'Cloudy', sunny: 'Sunny', storm: 'Storm', snow: 'Snow', none: 'Clear' }[weatherMode]
-  );
-
-  return (
-    <div className="weatherWidget">
-      <button
-        type="button"
-        className="weatherPill"
-        onClick={onToggleOpen}
-        title="Homescreen Weather Mood"
-        aria-label="Homescreen Weather Mood"
-      >
-        <span className="weatherIcon">{currentIcon}</span>
-        <span className="weatherLabel">{currentLabel}</span>
-        {weatherMode !== 'auto' && <span className="weatherDot" />}
-      </button>
-      {open && (
-        <div className="weatherMenu" onClick={e => e.stopPropagation()}>
-          <div className="weatherMenuTitle">
-            <strong>Homescreen Effect</strong>
-            <small>{weatherMode === 'auto' ? (weatherState.city ? `Live in ${weatherState.city}` : 'Live weather') : 'Custom mood'}</small>
-          </div>
-          <div className="weatherGrid">
-            {[
-              { id: 'auto', label: 'Auto (Live)', icon: '🌐' },
-              { id: 'rain', label: 'Raining', icon: '🌧️' },
-              { id: 'cloudy', label: 'Cloudy', icon: '☁️' },
-              { id: 'sunny', label: 'Sunny', icon: '☀️' },
-              { id: 'storm', label: 'Storm', icon: '⚡' },
-              { id: 'snow', label: 'Snow', icon: '❄️' },
-              { id: 'none', label: 'Off', icon: '🚫' }
-            ].map(opt => (
-              <button
-                key={opt.id}
-                type="button"
-                className={`weatherOpt ${weatherMode === opt.id ? 'active' : ''}`}
-                onClick={() => onChangeMode(opt.id)}
-              >
-                <span>{opt.icon}</span>
-                <small>{opt.label}</small>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
 
 // App icon: rendered from /icon.png
@@ -700,6 +467,8 @@ export default function Home() {
   const [queue, setQueue] = useState([]);
   const [queueIndex, setQueueIndex] = useState(-1);
   const [queueMode, setQueueMode] = useState('radio');
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState(false);
   const [history, setHistory] = useState([]);
   const [searchHistory, setSearchHistory] = useState([]);
   const [stats, setStats] = useState({});
@@ -724,101 +493,6 @@ export default function Home() {
     }
   });
   const [isMixing, setIsMixing] = useState(false);
-  const [weatherState, setWeatherState] = useState({
-    condition: 'sunny',
-    label: 'Sunny',
-    temp: null,
-    city: '',
-    icon: '☀️'
-  });
-  const [weatherMode, setWeatherMode] = useState(() => {
-    try {
-      return localStorage.getItem('sur-weather-mode') || 'auto';
-    } catch {
-      return 'auto';
-    }
-  });
-  const [weatherMenuOpen, setWeatherMenuOpen] = useState(false);
-
-  const changeWeatherMode = mode => {
-    setWeatherMode(mode);
-    try { localStorage.setItem('sur-weather-mode', mode); } catch {}
-  };
-
-  const activeWeatherEffect = weatherMode === 'auto' ? weatherState.condition : weatherMode;
-
-  useEffect(() => {
-    if (!weatherMenuOpen) return;
-    const closeMenu = () => setWeatherMenuOpen(false);
-    window.addEventListener('click', closeMenu);
-    return () => window.removeEventListener('click', closeMenu);
-  }, [weatherMenuOpen]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchWeatherForCoords = async (lat, lon, cityName = '') => {
-      try {
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code,temperature_2m,is_day`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled || !data?.current) return;
-
-        const code = data.current.weather_code;
-        const temp = data.current.temperature_2m;
-        const isDay = data.current.is_day !== 0;
-
-        let condition = 'sunny';
-        let label = isDay ? 'Sunny' : 'Clear Night';
-        let icon = isDay ? '☀️' : '🌙';
-
-        if ([95, 96, 99].includes(code)) {
-          condition = 'storm';
-          label = 'Thunderstorm';
-          icon = '⚡';
-        } else if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) {
-          condition = 'rain';
-          label = 'Raining';
-          icon = '🌧️';
-        } else if ([71, 73, 75, 77, 85, 86].includes(code)) {
-          condition = 'snow';
-          label = 'Snowing';
-          icon = '❄️';
-        } else if ([1, 2, 3, 45, 48].includes(code)) {
-          condition = 'cloudy';
-          label = code === 3 ? 'Overcast' : 'Cloudy';
-          icon = '☁️';
-        }
-
-        setWeatherState({ condition, label, temp, city: cityName, icon });
-      } catch {}
-    };
-
-    (async () => {
-      try {
-        const geoRes = await fetch('https://get.geojs.io/v1/ip/geo.json');
-        if (geoRes.ok) {
-          const geo = await geoRes.json();
-          if (geo?.latitude && geo?.longitude && !cancelled) {
-            await fetchWeatherForCoords(geo.latitude, geo.longitude, geo.city || '');
-          }
-        }
-      } catch {}
-
-      if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          pos => {
-            if (!cancelled) fetchWeatherForCoords(pos.coords.latitude, pos.coords.longitude);
-          },
-          () => {},
-          { timeout: 7000 }
-        );
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, []);
-
   const transitioningRef = useRef(false);
   const prefetchingRef = useRef(false);
   const stepRef = useRef();
@@ -882,17 +556,28 @@ export default function Home() {
     });
   };
 
+  // Batches changes into one POST, and skips fields the server already has.
   const syncTimeoutRef = useRef(null);
+  const pendingSyncRef = useRef({});
+  const lastSyncedRef = useRef({});
   const syncUserData = patch => {
     if (!user) return;
+    for (const [key, value] of Object.entries(patch)) {
+      if (lastSyncedRef.current[key] === JSON.stringify(value)) delete pendingSyncRef.current[key];
+      else pendingSyncRef.current[key] = value;
+    }
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    if (!Object.keys(pendingSyncRef.current).length) return;
     syncTimeoutRef.current = setTimeout(() => {
+      const body = pendingSyncRef.current;
+      pendingSyncRef.current = {};
+      for (const [key, value] of Object.entries(body)) lastSyncedRef.current[key] = JSON.stringify(value);
       fetch('/api/user/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch)
+        body: JSON.stringify(body)
       }).catch(() => {});
-    }, 600);
+    }, 1500);
   };
 
   useEffect(() => {
@@ -913,6 +598,7 @@ export default function Home() {
           setUser(res.user);
           try { localStorage.setItem('sur-session', JSON.stringify(res.user)); } catch {}
           if (res.data) {
+            for (const key of ['liked', 'downloads', 'history']) lastSyncedRef.current[key] = JSON.stringify(res.data[key] || []);
             if (res.data.profile) {
               setProfile(res.data.profile);
               try { localStorage.setItem('sur-profile', JSON.stringify(res.data.profile)); } catch {}
@@ -1200,14 +886,14 @@ export default function Home() {
 
   const upNext = useMemo(() => {
     if (!currentTrack || !queue.length) return null;
-    if (queueMode === 'list') return queue[(queueIndex + 1) % queue.length];
+    if (queueMode === 'list') return queue[(queueIndex + 1 + (shuffle && queue.length > 1 ? Math.floor(Math.random() * (queue.length - 1)) : 0)) % queue.length];
     return queue[queueIndex + 1] || pickSimilar(currentTrack, pool, played([...queue, ...history.slice(0, 20)]), prefs);
-  }, [currentTrack, queue, queueIndex, queueMode, pool, history, prefs]);
+  }, [currentTrack, queue, queueIndex, queueMode, shuffle, pool, history, prefs]);
 
   const step = (delta, isAutomixTransition = false) => {
     if (!queue.length) return;
     if (queueMode === 'list') {
-      const index = (queueIndex + delta + queue.length) % queue.length;
+      const index = shuffle && delta > 0 ? queue.indexOf(upNext) : (queueIndex + delta + queue.length) % queue.length;
       setQueueIndex(index);
       streamTrack(queue[index], isAutomixTransition);
       return;
@@ -1571,7 +1257,7 @@ export default function Home() {
 
   return (
     <main className="stage">
-      <div className={`phone ${isPlaying ? 'playing' : ''}`} data-weather={view === 'home' ? activeWeatherEffect : 'default'}>
+      <div className={`phone ${isPlaying ? 'playing' : ''}`}>
         <header className="topBar">
           <Brand />
           <button className={`homeCircle ${tab === 'home' ? 'active' : ''}`} onClick={goHome} aria-label="Home"><Icon name="home" /></button>
@@ -1581,13 +1267,6 @@ export default function Home() {
             <Icon name="search" />
           </button>
           <div className="topActions">
-            <WeatherWidget
-              weatherState={weatherState}
-              weatherMode={weatherMode}
-              onChangeMode={changeWeatherMode}
-              open={weatherMenuOpen}
-              onToggleOpen={() => setWeatherMenuOpen(o => !o)}
-            />
             {user ? <button className="avatarBtn" onClick={() => go('settings')} aria-label="Account settings">{initial}</button> : <>
               <button className="signupLink" onClick={() => setAuth({ mode: 'signup' })}>Sign up</button>
               <button className="loginBtn big" onClick={() => setAuth({ mode: 'login' })}>Log in</button>
@@ -1616,19 +1295,11 @@ export default function Home() {
         </aside>
 
         <div className="scroll" ref={scrollRef}>
-          {view === 'home' && <div className="homeWrapper" data-weather={activeWeatherEffect} key="home">
-            <WeatherCanvas effect={activeWeatherEffect} />
+          {view === 'home' && <div className="homeWrapper" key="home">
             <section className="homeTop">
               <div className="homeBar">
                 <Brand />
                 <div className="homeBarRight">
-                  <WeatherWidget
-                    weatherState={weatherState}
-                    weatherMode={weatherMode}
-                    onChangeMode={changeWeatherMode}
-                    open={weatherMenuOpen}
-                    onToggleOpen={() => setWeatherMenuOpen(o => !o)}
-                  />
                   {user ? <button className="avatarBtn" onClick={() => go('settings')} aria-label="Account settings">{initial}</button>
                     : <button className="loginBtn" onClick={() => setAuth({ mode: 'login' })}>Log in</button>}
                 </div>
@@ -1639,9 +1310,6 @@ export default function Home() {
                 <span className="searchText">{query || 'Search songs, albums or artists'}</span>
                 <Icon name="search" />
               </button>
-              <div className="chips">
-                {suggestions.slice(0, 4).map(item => <button key={item} onClick={() => openSearch(item)}>{item}</button>)}
-              </div>
             </section>
 
             <section className="sheet">
@@ -1942,26 +1610,11 @@ export default function Home() {
 
           {view === 'player' && currentTrack && <section key={`player-${currentTrack.id}`} className="playerScreen">
             <div className="playerTop">
-              <span>Now playing{currentTrack.album ? ` · ${currentTrack.album}` : ''}</span>
-              <div className="playerTopActions">
-                <button
-                  type="button"
-                  className={`automixPill ${automix ? 'active' : ''}`}
-                  onClick={toggleAutomix}
-                  title={`Automix ${automix ? 'ON (Smart crossfade active)' : 'OFF'}`}
-                  aria-label="Toggle Automix"
-                >
-                  <Icon name="automix" size={14} />
-                  <span>Automix</span>
-                  {automix && <span className="automixDot" />}
-                </button>
-                <button type="button" className="iconBtn round" onClick={closePlayer} aria-label="Close player"><Icon name="down" /></button>
-              </div>
+              <button type="button" className="iconBtn" onClick={closePlayer} aria-label="Close player"><Icon name="down" size={26} /></button>
+              <strong>{currentTrack.album || 'Now playing'}</strong>
+              <button type="button" className="iconBtn" onClick={downloadCurrent} aria-label="Download"><Icon name="download" /></button>
             </div>
-            <div className="art">
-              <div className="vinyl" />
-              <img src={currentTrack.img} alt="" />
-            </div>
+            <div className="art"><img src={currentTrack.img} alt="" /></div>
             {isMixing && (
               <div className="automixBanner">
                 <span className="pulseWave">
@@ -1972,17 +1625,31 @@ export default function Home() {
                 <span>Automixing into {upNext ? upNext.song : 'next track'}…</span>
               </div>
             )}
-            <div className="controls">
-              <button onClick={toggleLike} className={isLiked ? 'on' : ''} aria-label="Like"><Icon name="heart" fill={isLiked} size={20} /></button>
-              <button onClick={() => step(-1)} aria-label="Previous"><Icon name="prev" fill /></button>
-              <button className="mainPlay" onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}><Icon name={isPlaying ? 'pause' : 'play'} fill /></button>
-              <button onClick={() => step(1)} aria-label="Next"><Icon name="next" fill /></button>
-              <button type="button" onClick={downloadCurrent} aria-label="Download"><Icon name="download" size={20} /></button>
-            </div>
-            <input className="progress" type="range" min="0" max="100" value={progress} onChange={seek} style={{ '--p': `${progress}%` }} aria-label="Seek" />
             <div className="trackInfo">
               <div><h2>{currentTrack.song}</h2><p>{status || currentTrack.artist}</p></div>
-              <span>{elapsed} / {fmt(duration)}</span>
+              <button onClick={toggleLike} className={`likeBtn ${isLiked ? 'on' : ''}`} aria-label="Like"><Icon name="heart" fill={isLiked} size={26} /></button>
+            </div>
+            <input className="progress" type="range" min="0" max="100" value={progress} onChange={seek} style={{ '--p': `${progress}%` }} aria-label="Seek" />
+            <div className="times"><span>{elapsed}</span><span>-{fmt(duration - currentTime)}</span></div>
+            <div className="controls">
+              <button onClick={() => setShuffle(v => !v)} className={shuffle ? 'on' : ''} aria-label="Shuffle" aria-pressed={shuffle}><Icon name="shuffle" /></button>
+              <button onClick={() => step(-1)} aria-label="Previous"><Icon name="prev" fill size={30} /></button>
+              <button className="mainPlay" onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}><Icon name={isPlaying ? 'pause' : 'play'} fill size={32} /></button>
+              <button onClick={() => step(1)} aria-label="Next"><Icon name="next" fill size={30} /></button>
+              <button onClick={() => setRepeat(v => !v)} className={repeat ? 'on' : ''} aria-label="Repeat" aria-pressed={repeat}><Icon name="repeat" /></button>
+            </div>
+            <div className="playerBar">
+              <button
+                type="button"
+                className={`automixPill ${automix ? 'active' : ''}`}
+                onClick={toggleAutomix}
+                title={`Automix ${automix ? 'ON (Smart crossfade active)' : 'OFF'}`}
+                aria-label="Toggle Automix"
+              >
+                <Icon name="automix" size={14} />
+                <span>Automix</span>
+                {automix && <span className="automixDot" />}
+              </button>
             </div>
             {upNext && <div className="upNext">
               <div className="sectionHead"><h2>Up next</h2><span>{queueMode === 'radio' ? 'Similar vibe' : 'In order'}</span></div>
@@ -2136,6 +1803,7 @@ export default function Home() {
         <audio
           ref={audioRef}
           preload="metadata"
+          loop={repeat}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={event => {
             const dur = event.currentTarget.duration;

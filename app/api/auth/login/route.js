@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
+import { rateLimit } from '@/lib/rateLimit';
 import { verifyPassword, signToken, getCookieOptions, COOKIE_NAME } from '@/lib/auth';
 
 export async function POST(request) {
   try {
+    const limited = await rateLimit(request, 'login', 10, 15 * 60);
+    if (limited) return limited;
+
     const { email, password } = await request.json();
 
     if (!email || !password) {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { ObjectId } from 'mongodb';
 import { getDb } from '@/lib/mongodb';
+import { rateLimit } from '@/lib/rateLimit';
 import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 
 async function getAuthUserId() {
@@ -12,8 +13,11 @@ async function getAuthUserId() {
   return payload?.id || null;
 }
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const limited = await rateLimit(request, 'data-get', 60, 60);
+    if (limited) return limited;
+
     const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -43,6 +47,9 @@ export async function GET() {
 
 export async function POST(request) {
   try {
+    const limited = await rateLimit(request, 'data-post', 30, 60);
+    if (limited) return limited;
+
     const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
