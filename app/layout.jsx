@@ -1,5 +1,6 @@
 import { Poppins } from 'next/font/google';
 import './globals.css';
+import Script from 'next/script';
 import { Analytics } from '@vercel/analytics/next';
 
 const poppins = Poppins({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-poppins' });
@@ -34,6 +35,12 @@ export default function RootLayout({ children }) {
       <body>
         {children}
         <Analytics />
+        {process.env.NEXT_PUBLIC_ADSENSE_CLIENT && <Script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT}`}
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />}
       </body>
     </html>
   );

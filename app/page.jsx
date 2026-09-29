@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { track as trackEvent } from '@vercel/analytics';
 import DetailView from './DetailView';
+import AdBreak from './AdBreak';
 
 // Used until the listener picks their own artists in onboarding.
 const DEFAULT_ARTISTS = [
@@ -916,8 +917,51 @@ export default function Home() {
   const artistHits = q ? [...artists.filter(a => norm(a.name).includes(q)), ...(results.artists || [])].filter((a, i, list) => list.findIndex(b => b.id === a.id) === i).slice(0, 6) : [];
   const showAll = searchTab === 'all';
 
-  const streamTrack = async (track, isAutomixTransition = false) => {
+  // Ad breaks: every N songs, one non-skippable ad. The counter lives in localStorage,
+  // so refreshing or killing the app brings the pending ad straight back.
+  const [adsConfig, setAdsConfig] = useState({ enabled: false, adTag: '', songsPerAd: 3, isAdmin: false });
+  const [adBreak, setAdBreak] = useState(null);
+  const adCountRef = useRef(0);
+  const setAdCount = n => {
+    adCountRef.current = n;
+    try { localStorage.setItem('sur-ad-count', String(n)); } catch {}
+  };
+  useEffect(() => {
+    try { adCountRef.current = Number(localStorage.getItem('sur-ad-count')) || 0; } catch {}
+  }, []);
+  useEffect(() => {
+    fetch('/api/ads').then(res => res.ok ? res.json() : null).then(config => config && setAdsConfig(config)).catch(() => {});
+  }, [user]);
+  const adDue = adsConfig.enabled && adsConfig.adTag && adCountRef.current >= adsConfig.songsPerAd;
+  // Owed an ad from before the refresh: show it before anything else plays.
+  useEffect(() => {
+    if (adDue && !adBreak) {
+      audioRef.current?.pause();
+      setAdBreak({ track: null });
+    }
+  }, [adsConfig]);
+  const finishAd = played => {
+    if (played) setAdCount(0);
+    const pending = adBreak?.track;
+    setAdBreak(null);
+    // skipAd: a failed/no-fill ad lets this song through; the next song tries again.
+    if (pending) streamTrack(pending, false, true);
+  };
+  const saveAds = async patch => {
+    const res = await fetch('/api/ads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) }).catch(() => null);
+    const next = await res?.json().catch(() => null);
+    if (res?.ok) setAdsConfig(next);
+    else alert(next?.error || 'Could not save ad settings');
+  };
+
+  const streamTrack = async (track, isAutomixTransition = false, skipAd = false) => {
     if (!audioRef.current) return;
+    if (!skipAd && adDue) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+      setAdBreak({ track });
+      return;
+    }
     setCurrentTrack(track);
     setStatus('Loading…');
     setIsPlaying(false);
@@ -952,6 +996,7 @@ export default function Home() {
       audioRef.current.load();
       await audioRef.current.play();
       setStatus(preview ? '30s preview · full song not on JioSaavn' : '');
+      setAdCount(adCountRef.current + 1);
       const played = track;
       setHistory(items => [played, ...items.filter(item => keyOf(item) !== keyOf(played))].slice(0, 50));
       try { trackEvent('play_song', { song: track.song, artist: track.artist, automix }); } catch {}
@@ -1040,7 +1085,7 @@ export default function Home() {
   };
 
   const togglePlay = async () => {
-    if (!audioRef.current || !currentTrack) return;
+    if (!audioRef.current || !currentTrack || adBreak) return;
     if (audioRef.current.paused) {
       try { await audioRef.current.play(); } catch {}
     } else {
@@ -1715,6 +1760,23 @@ export default function Home() {
                   <span className="menuIcon"><Icon name="download" /></span>
                   <span className="rowText"><strong>Clear downloads list</strong><small>{downloads.length} songs</small></span>
                 </button>
+                {adsConfig.isAdmin && <div className="menuItem staticItem">
+                  <span className={`menuIcon ${adsConfig.enabled ? 'accentGrad' : ''}`}><Icon name="disc" /></span>
+                  <div className="rowText">
+                    <strong>Ads (owner)</strong>
+                    <small>{adsConfig.enabled ? `On for everyone · 1 ad every ${adsConfig.songsPerAd} songs` : 'Off for everyone'}</small>
+                  </div>
+                  <button type="button" className={`toggleSwitch ${adsConfig.enabled ? 'on' : ''}`} onClick={() => saveAds({ enabled: !adsConfig.enabled })} role="switch" aria-checked={adsConfig.enabled} aria-label="Toggle ads">
+                    <span className="toggleHandle" />
+                  </button>
+                </div>}
+                {adsConfig.isAdmin && <form className="adTagForm" onSubmit={e => { e.preventDefault(); saveAds({ adTag: e.currentTarget.adTag.value }); }}>
+                  <label htmlFor="adTag">Ad Manager VAST tag URL <small>(empty = Google test ad)</small></label>
+                  <div>
+                    <input id="adTag" name="adTag" defaultValue={adsConfig.adTag} key={adsConfig.adTag} placeholder="https://pubads.g.doubleclick.net/gampad/ads?..." />
+                    <button type="submit" className="loginBtn">Save</button>
+                  </div>
+                </form>}
                 {user && <button className="menuItem" onClick={signOut}>
                   <span className="menuIcon danger"><Icon name="logout" /></span>
                   <span className="rowText"><strong>Log out</strong><small>Signed in as {user.email}</small></span>
@@ -2123,6 +2185,7 @@ export default function Home() {
           </div>
         </div>}
 
+        {adBreak && <AdBreak adTag={adsConfig.adTag} onDone={finishAd} />}
         {auth && <AuthModal mode={auth.mode} defaultName={profile?.name} onDone={finishAuth} onClose={() => setAuth(null)} />}
 
         {ready && (!profile || editingTaste) && <Onboarding
