@@ -3,9 +3,6 @@
 import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { track as trackEvent } from '@vercel/analytics';
 
-// ponytail: unofficial JioSaavn API, swap the host if it goes down like musicapi.x007 did
-const SAAVN = 'https://saavn.sumit.co/api';
-
 // Used until the listener picks their own artists in onboarding.
 const DEFAULT_ARTISTS = [
   { id: '697691', name: 'Karan Aujla', img: 'https://c.saavncdn.com/artists/Karan_Aujla_005_20260925061936_500x500.jpg' },
@@ -145,7 +142,7 @@ async function api(path, signal) {
 
   const promise = (async () => {
     try {
-      const response = await fetch(`${SAAVN}${path}`, { signal });
+      const response = await fetch(`/api/saavn?path=${encodeURIComponent(path)}`, { signal });
       if (!response.ok) throw new Error(response.status);
       const json = await response.json();
       const data = json.data;
