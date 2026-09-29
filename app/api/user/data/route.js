@@ -26,7 +26,7 @@ export async function GET(request) {
     const db = await getDb();
     const user = await db.collection('users').findOne(
       { _id: new ObjectId(userId) },
-      { projection: { profile: 1, liked: 1, downloads: 1, history: 1 } }
+      { projection: { profile: 1, liked: 1, favArtists: 1, downloads: 1, history: 1 } }
     );
 
     if (!user) {
@@ -36,6 +36,7 @@ export async function GET(request) {
     return NextResponse.json({
       profile: user.profile || null,
       liked: user.liked || [],
+      favArtists: user.favArtists || [],
       downloads: user.downloads || [],
       history: user.history || []
     });
@@ -64,6 +65,9 @@ export async function POST(request) {
     }
     if ('liked' in body && Array.isArray(body.liked)) {
       updateFields.liked = body.liked;
+    }
+    if ('favArtists' in body && Array.isArray(body.favArtists)) {
+      updateFields.favArtists = body.favArtists.slice(0, 200);
     }
     if ('downloads' in body && Array.isArray(body.downloads)) {
       updateFields.downloads = body.downloads;

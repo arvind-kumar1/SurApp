@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { extractColorFromImage } from '@/lib/color';
 
 const fmtDuration = sec => {
@@ -49,6 +49,8 @@ export default function DetailView({
 }) {
   const [color, setColor] = useState({ r: 42, g: 68, b: 86, hex: '#2a4456' });
   const [copied, setCopied] = useState(false);
+  const [stuck, setStuck] = useState(false);
+  const actionBarRef = useRef(null);
 
   const title = type === 'album' ? item?.name : item?.song;
   const imgUrl = item?.img;
@@ -59,6 +61,18 @@ export default function DetailView({
       extractColorFromImage(imgUrl, title || 'cover').then(setColor);
     }
   }, [imgUrl, title]);
+
+  // Show play button in the sticky top bar once the big one scrolls under it
+  useEffect(() => {
+    const el = actionBarRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => setStuck(!entry.isIntersecting),
+      { root: el.closest('.scroll'), rootMargin: '-64px 0px 0px 0px' }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [item]);
 
   if (!item) return null;
 
@@ -125,7 +139,7 @@ export default function DetailView({
       }}
     >
       {/* Top back navigation */}
-      <div className="detailBackBar">
+      <div className={`detailBackBar ${stuck ? 'stuck' : ''}`}>
         <button
           type="button"
           className="detailBackBtn"
@@ -134,6 +148,16 @@ export default function DetailView({
         >
           <Icon name="back" size={20} />
         </button>
+        <button
+          type="button"
+          className="detailPlayBtn detailStickyPlay"
+          onClick={handlePlayClick}
+          aria-label={isPlayingThis ? 'Pause' : 'Play'}
+          tabIndex={stuck ? 0 : -1}
+        >
+          <Icon name={isPlayingThis ? 'pause' : 'play'} fill size={20} />
+        </button>
+        <span className="detailStickyTitle">{title}</span>
       </div>
 
       {/* Hero Header */}
@@ -224,7 +248,7 @@ export default function DetailView({
       </div>
 
       {/* Action Bar */}
-      <div className="detailActionBar">
+      <div className="detailActionBar" ref={actionBarRef}>
         <div className="detailActionsLeft">
           <button
             type="button"
@@ -283,7 +307,7 @@ export default function DetailView({
             title={copied ? 'Link Copied!' : 'Share / More'}
             aria-label="More"
           >
-            <Icon name="more" size={22} />
+            <Icon name="more" fill size={24} />
           </button>
         </div>
 

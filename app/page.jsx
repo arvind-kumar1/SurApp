@@ -162,10 +162,28 @@ async function api(path, signal) {
   return promise;
 }
 
-async function saavnSearch(q, signal) {
-  const data = await api(`/search/songs?query=${encodeURIComponent(q)}&limit=20`, signal);
+async function saavnSearch(q, signal, page = 1) {
+  const data = await api(`/search/songs?query=${encodeURIComponent(q)}&limit=20${page > 1 ? `&page=${page}` : ''}`, signal);
   return (data?.results || []).map(mapSong).filter(item => item.url);
 }
+
+// Songs JioSaavn doesn't have. No url: playTrack re-checks JioSaavn, then falls back to the 30s Apple preview.
+async function itunesSearch(q, signal) {
+  const response = await fetch(`https://itunes.apple.com/search?entity=song&country=IN&limit=15&term=${encodeURIComponent(q)}`, { signal });
+  if (!response.ok) return [];
+  return ((await response.json()).results || []).filter(item => item.previewUrl).map(item => ({
+    id: `it-${item.trackId}`,
+    song: item.trackName,
+    artist: item.artistName,
+    album: item.collectionName,
+    year: item.releaseDate?.slice(0, 4),
+    duration: Math.round((item.trackTimeMillis || 0) / 1000),
+    img: item.artworkUrl100?.replace('100x100', '500x500') || '',
+    url: '',
+    source: 'itunes'
+  }));
+}
+const sameSong = (a, b) => sameTitle(a.song, b.song) && norm(a.artist).includes(norm(b.artist.split(/,|&/)[0]));
 
 const artistCache = new Map();
 async function findArtists(q, limit, signal) {
@@ -178,13 +196,15 @@ async function findArtists(q, limit, signal) {
 }
 
 async function searchAll(q, names, signal) {
-  const [songs, albums, foundArtists] = await Promise.all([
+  const [saavnSongs, appleSongs, albums, foundArtists] = await Promise.all([
     saavnSearch(q, signal),
+    itunesSearch(q, signal).catch(error => { if (error.name === 'AbortError') throw error; return []; }),
     api(`/search/albums?query=${encodeURIComponent(q)}&limit=12`, signal).then(data => (data?.results || []).map(mapAlbum)),
     findArtists(q, 6, signal)
   ]);
   const first = (a, b) => ours(b, names) - ours(a, names);
-  return { songs: songs.sort(first), albums: albums.sort(first), artists: foundArtists };
+  const extra = appleSongs.filter(apple => !saavnSongs.some(song => sameSong(song, apple)));
+  return { songs: [...saavnSongs.sort(first), ...extra], albums: albums.sort(first), artists: foundArtists, page: 1, more: saavnSongs.length >= 20 };
 }
 
 const searchTabs = [['all', 'All'], ['songs', 'Songs'], ['albums', 'Albums'], ['artists', 'Artists']];
@@ -230,10 +250,10 @@ const icons = {
   download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   right: 'M9 6l6 6-6 6',
   down: 'M6 9l6 6 6-6',
-  play: 'M8 5l11 7-11 7z',
-  pause: 'M7 5h3v14H7zM14 5h3v14h-3z',
-  prev: 'M18 6l-9 6 9 6zM6 6v12',
-  next: 'M6 6l9 6-9 6zM18 6v12',
+  play: 'M8 5.6v12.8a1 1 0 0 0 1.5.86l10.2-6.4a1 1 0 0 0 0-1.72L9.5 4.74A1 1 0 0 0 8 5.6z',
+  pause: 'M7 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM14 4h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z',
+  prev: 'M18 6.5v11a1 1 0 0 1-1.55.83L8.5 13a1.2 1.2 0 0 1 0-2l7.95-5.33A1 1 0 0 1 18 6.5zM5 5h2a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5z',
+  next: 'M6 6.5v11a1 1 0 0 0 1.55.83L15.5 13a1.2 1.2 0 0 0 0-2L7.55 5.67A1 1 0 0 0 6 6.5zM19 5h-2a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2z',
   heart: 'M12 20s-8-5-8-10.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5C20 15 12 20 12 20z',
   search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4',
   close: 'M6 6l12 12M18 6L6 18',
@@ -251,9 +271,9 @@ const icons = {
   clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
   more: 'M12 13a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm7 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM5 13a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z',
   list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
-  circlePlus: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z',
-  circleCheck: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5l-4-4 1.41-1.41L11 13.67l6.59-6.59L19 8.5l-8 8z',
-  circleDownload: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 10.59l2.29-2.29 1.42 1.41-4.71 4.71-4.71-4.71 1.42-1.41L11 12.59V6h2v6.59z'
+  circlePlus: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 8v8M8 12h8',
+  circleCheck: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM8 12l3 3 5-6',
+  circleDownload: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 7v9M8 12l4 4 4-4'
 };
 
 function Icon({ name, fill = false, size = 22 }) {
@@ -282,16 +302,11 @@ function Brand() {
   return <div className="brand"><Logo /><span className="wordmark">Sur</span></div>;
 }
 
-function Header({ title, crumbs, onBack, action }) {
-  return <header className="header">
-    <div className="headerBar">
-      <button className="iconBtn" onClick={onBack} aria-label="Back"><Icon name="back" /></button>
-      <span className="iconBtn"><Icon name="grid" fill size={18} /></span>
-    </div>
-    <div className="headerTitle">
-      <div><h1>{title}</h1><div className="crumbs">{crumbs.join('  ›  ')}</div></div>
-      {action}
-    </div>
+function Header({ title, onBack, action }) {
+  return <header className="searchTitle">
+    <button className="searchBack" onClick={onBack} aria-label="Back"><Icon name="back" size={22} /></button>
+    {title && <h1>{title}</h1>}
+    {action && <span className="headerAction">{action}</span>}
   </header>;
 }
 
@@ -361,6 +376,7 @@ function AuthModal({ mode: initialMode, defaultName, onDone, onClose }) {
       const clientData = {
         profile: readJSON('sur-profile', null),
         liked: readJSON('kax-liked', []),
+        favArtists: readJSON('sur-fav-artists', []),
         downloads: readJSON('psf-downloads', []),
         history: readJSON('kax-history', [])
       };
@@ -491,6 +507,7 @@ export default function Home() {
   const [results, setResults] = useState({ songs: [], albums: [], artists: [] });
   const [searching, setSearching] = useState(false);
   const [liked, setLiked] = useState([]);
+  const [favArtists, setFavArtists] = useState([]);
   const [downloads, setDownloads] = useState([]);
   const [pages, setPages] = useState({});
   const [stack, setStack] = useState(['home']);
@@ -625,6 +642,7 @@ export default function Home() {
   useEffect(() => {
     try {
       setLiked(JSON.parse(localStorage.getItem('kax-liked') || '[]'));
+      setFavArtists(JSON.parse(localStorage.getItem('sur-fav-artists') || '[]'));
       setDownloads(JSON.parse(localStorage.getItem('psf-downloads') || '[]'));
       setHistory(JSON.parse(localStorage.getItem('kax-history') || '[]'));
       setSearchHistory(JSON.parse(localStorage.getItem('sur-search-history') || '[]'));
@@ -640,7 +658,7 @@ export default function Home() {
           setUser(res.user);
           try { localStorage.setItem('sur-session', JSON.stringify(res.user)); } catch {}
           if (res.data) {
-            for (const key of ['liked', 'downloads', 'history']) lastSyncedRef.current[key] = JSON.stringify(res.data[key] || []);
+            for (const key of ['liked', 'favArtists', 'downloads', 'history']) lastSyncedRef.current[key] = JSON.stringify(res.data[key] || []);
             if (res.data.profile) {
               setProfile(res.data.profile);
               try { localStorage.setItem('sur-profile', JSON.stringify(res.data.profile)); } catch {}
@@ -648,6 +666,10 @@ export default function Home() {
             if (res.data.liked?.length) {
               setLiked(res.data.liked);
               try { localStorage.setItem('kax-liked', JSON.stringify(res.data.liked)); } catch {}
+            }
+            if (res.data.favArtists?.length) {
+              setFavArtists(res.data.favArtists);
+              try { localStorage.setItem('sur-fav-artists', JSON.stringify(res.data.favArtists)); } catch {}
             }
             if (res.data.downloads?.length) {
               setDownloads(res.data.downloads);
@@ -678,6 +700,11 @@ export default function Home() {
     try { localStorage.setItem('kax-liked', JSON.stringify(liked)); } catch {}
     if (ready) syncUserData({ liked });
   }, [liked, ready]);
+
+  useEffect(() => {
+    try { localStorage.setItem('sur-fav-artists', JSON.stringify(favArtists)); } catch {}
+    if (ready) syncUserData({ favArtists });
+  }, [favArtists, ready]);
 
   useEffect(() => {
     try { localStorage.setItem('psf-downloads', JSON.stringify(downloads)); } catch {}
@@ -796,6 +823,14 @@ export default function Home() {
       .sort((x, y) => (Number(y.year) - Number(x.year)) || (Number(y.id) - Number(x.id)));
   }, [pages, artists]);
 
+  // Spotify-style shortcut grid: what you played, then liked, then new albums.
+  const quickPicks = useMemo(() => {
+    const seen = new Set();
+    return [...history, ...liked, ...latest]
+      .filter(item => item && !seen.has(item.song ? keyOf(item) : `a-${item.id}`) && seen.add(item.song ? keyOf(item) : `a-${item.id}`))
+      .slice(0, 8);
+  }, [history, liked, latest]);
+
   const trending = useMemo(() => newSongs.filter(item => item.id in stats).sort((a, b) => stats[b.id] - stats[a.id]).slice(0, 10), [newSongs, stats]);
 
   // Every song the app has seen is a candidate for recommendations and radio.
@@ -834,6 +869,24 @@ export default function Home() {
     }, 250);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [query, searchOpen]);
+
+  const [loadingMoreSongs, setLoadingMoreSongs] = useState(false);
+  const loadMoreSongs = async () => {
+    const q = norm(query);
+    setLoadingMoreSongs(true);
+    try {
+      const page = (results.page || 1) + 1;
+      const next = await saavnSearch(q, undefined, page);
+      const seen = new Set(results.songs.map(item => item.id));
+      const fresh = next.filter(item => !seen.has(item.id));
+      // Saavn-found songs replace their Apple-preview duplicates.
+      const songs = [...results.songs.filter(item => item.source !== 'itunes' || !fresh.some(song => sameSong(song, item))), ...fresh];
+      const found = { ...results, songs, page, more: next.length >= 20 && fresh.length > 0 };
+      searchCache.current.set(q, found);
+      setResults(found);
+    } catch {}
+    setLoadingMoreSongs(false);
+  };
 
   const openSearch = (value = query) => {
     setQuery(value);
@@ -931,6 +984,42 @@ export default function Home() {
     if (queueMode === 'list') return queue[(queueIndex + 1 + (shuffle && queue.length > 1 ? Math.floor(Math.random() * (queue.length - 1)) : 0)) % queue.length];
     return queue[queueIndex + 1] || pickSimilar(currentTrack, pool, played([...queue, ...history.slice(0, 20)]), prefs);
   }, [currentTrack, queue, queueIndex, queueMode, shuffle, pool, history, prefs]);
+
+  // Spotify-style cover swipe: art follows the finger, past the threshold it flies off and the song changes.
+  const swipeRef = useRef(null);
+  const swipeResetRef = useRef(null);
+  const [swipe, setSwipe] = useState({ x: 0, anim: false, dir: 0 });
+  const onArtDown = e => { swipeRef.current = { x0: e.clientX, y0: e.clientY, t: Date.now(), active: false }; };
+  const onArtMove = e => {
+    const drag = swipeRef.current;
+    if (!drag) return;
+    const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+    if (!drag.active) {
+      if (Math.abs(dx) < 8) return;
+      if (Math.abs(dy) > Math.abs(dx)) { swipeRef.current = null; return; }
+      drag.active = true;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    setSwipe({ x: dx, anim: false, dir: 0 });
+  };
+  const onArtUp = e => {
+    const drag = swipeRef.current;
+    swipeRef.current = null;
+    if (!drag?.active) return;
+    const dx = e.clientX - drag.x0;
+    const flick = Math.abs(dx) / Math.max(1, Date.now() - drag.t) > 0.5 && Math.abs(dx) > 30;
+    if (Math.abs(dx) < 90 && !flick) return setSwipe({ x: 0, anim: true, dir: 0 });
+    const dir = dx < 0 ? 1 : -1;
+    setSwipe({ x: -dir * window.innerWidth, anim: true, dir });
+    setTimeout(() => step(dir), 200);
+    // No next/previous song: spring back instead of leaving the art off-screen.
+    clearTimeout(swipeResetRef.current);
+    swipeResetRef.current = setTimeout(() => setSwipe({ x: 0, anim: true, dir: 0 }), 1500);
+  };
+  useEffect(() => {
+    clearTimeout(swipeResetRef.current);
+    setSwipe(current => ({ x: 0, anim: false, dir: current.dir }));
+  }, [currentTrack?.id]);
 
   const step = (delta, isAutomixTransition = false) => {
     if (!queue.length) return;
@@ -1244,6 +1333,7 @@ export default function Home() {
     if (cloudData) {
       if (cloudData.profile) saveProfile(cloudData.profile, false);
       if (cloudData.liked?.length) setLiked(cloudData.liked);
+      if (cloudData.favArtists?.length) setFavArtists(cloudData.favArtists);
       if (cloudData.downloads?.length) setDownloads(cloudData.downloads);
       if (cloudData.history?.length) setHistory(cloudData.history);
     } else if (profile && !profile.name) {
@@ -1290,7 +1380,7 @@ export default function Home() {
     }
   };
 
-  const libraryViews = ['library', 'history', 'artists', 'albums', 'artist', 'album', 'song', 'liked', 'downloads', 'settings'];
+  const libraryViews = ['library', 'history', 'artists', 'albums', 'artist', 'album', 'song', 'liked', 'favArtists', 'downloads', 'settings'];
   const tab = view === 'collection' ? 'search' : libraryViews.includes(view) ? 'library' : view;
   const goTab = target => target === 'home' ? goHome() : go(target);
   const initial = (user?.name || profile?.name || '?').trim().charAt(0).toUpperCase();
@@ -1300,6 +1390,10 @@ export default function Home() {
     go('artist');
     ['songs', 'albums'].forEach(kind => !pages[`${kind}:${a.id}`] && loadMore(kind, a.id));
   };
+
+  const isFav = a => a && favArtists.some(x => x.id === a.id);
+  const toggleFavArtist = ({ id, name, img }) =>
+    setFavArtists(items => items.some(x => x.id === id) ? items.filter(x => x.id !== id) : [{ id, name, img }, ...items]);
 
   const openAlbum = async a => {
     setAlbum({ ...a, songs: null });
@@ -1353,6 +1447,7 @@ export default function Home() {
     ['All Songs', `${allSongsCount} Songs`, 'disc', 'artists'],
     ['Albums', `${allAlbumsCount} Albums`, 'album', 'albums'],
     ['Liked Songs', `${liked.length} Songs`, 'heart', 'liked'],
+    ['Favorite Artists', `${favArtists.length} Artists`, 'user', 'favArtists'],
     ['Downloads', `${downloads.length} Songs`, 'download', 'downloads'],
     ['Settings', user ? user.email : 'Account & audio preferences', 'settings', 'settings'],
     ['Your taste', tasteSummary, 'user', 'taste']
@@ -1414,15 +1509,21 @@ export default function Home() {
                     : <button className="loginBtn" onClick={() => setAuth({ mode: 'login' })}>Log in</button>}
                 </div>
               </div>
-              <h1 className="homeTitle">{greeting}{profile?.name ? `, ${profile.name}` : ''}</h1>
-              <button className="search" onClick={() => openSearch()}>
-                <kbd>⌘K</kbd>
-                <span className="searchText">{query || 'Search songs, albums or artists'}</span>
-                <Icon name="search" />
-              </button>
             </section>
 
             <section className="sheet">
+                <h1 className="homeTitle">{greeting}{profile?.name ? `, ${profile.name.split(' ')[0]}` : ''}</h1>
+                <div className="quickGrid">
+                  {quickPicks.map(item => !item.song
+                    ? <button className="quickTile" key={`a-${item.id}`} onClick={() => openAlbum(item)}>
+                        <img src={item.img} alt="" loading="lazy" /><strong>{item.name}</strong>
+                      </button>
+                    : <button className={`quickTile ${isCurrent(item) ? 'active' : ''}`} key={keyOf(item)} onClick={() => playTrack(item, quickPicks.filter(x => x.song))}>
+                        <img src={item.img} alt="" loading="lazy" /><strong>{item.song}</strong>
+                        <span className="quickPlay"><Icon name={isCurrent(item) && isPlaying ? 'pause' : 'play'} fill size={16} /></span>
+                      </button>)}
+                  {!quickPicks.length && Array.from({ length: 6 }).map((_, i) => <div key={i} className="quickTile shimmer" aria-hidden="true" />)}
+                </div>
                 {history.length > 0 && <>
                   <div className="sectionHead"><h2>Recently played</h2><button onClick={() => go('history')}>Show all</button></div>
                   <div className="albums scrollRow">
@@ -1479,6 +1580,16 @@ export default function Home() {
                   {!latest.length && <ShimmerCards count={7} />}
                 </div>
 
+                {favArtists.length > 0 && <>
+                  <div className="sectionHead"><h2>Your favorite artists</h2><button onClick={() => go('favArtists')}>Show all</button></div>
+                  <div className="artistsRow">
+                    {favArtists.map(a => <button className="artistCard" key={a.id} onClick={() => openArtist(a)}>
+                      <img src={a.img} alt="" />
+                      <strong>{a.name}</strong>
+                    </button>)}
+                  </div>
+                </>}
+
                 <div className="sectionHead"><h2>Artists</h2></div>
                 <div className="artistsRow">
                   {artists.map(a => <button className="artistCard" key={a.id} onClick={() => openArtist(a)}>
@@ -1497,13 +1608,14 @@ export default function Home() {
           </div>}
 
           {view === 'search' && <section key="search" className="page">
-            <Header title="Search" crumbs={['Home', 'Search']} onBack={back} />
-            <div className="padX">
-              <button className="search" onClick={() => openSearch('')}>
-                <kbd>⌘K</kbd>
-                <span className="searchText">What do you want to play?</span>
-                <Icon name="search" />
+            <Header title="Search" onBack={back} />
+            <div className="searchSticky">
+              <button className="searchPill" onClick={() => openSearch('')}>
+                <Icon name="search" size={22} />
+                <span>What do you want to listen to?</span>
               </button>
+            </div>
+            <div className="padX">
               <div className="sectionHead browseHead"><h2>Browse all</h2></div>
               <div className="tiles">
                 {tiles.map(tile => <button className="tile" key={tile.id} style={{ '--tile': tile.color }} onClick={() => openCollection(tile)}>
@@ -1539,7 +1651,7 @@ export default function Home() {
           </section>}
 
           {view === 'settings' && <section key="settings" className="page">
-            <Header title="Settings" crumbs={['Home', 'Settings']} onBack={back} />
+            <Header title="Settings" onBack={back} />
             <div className="padX">
               <div className="accountCard">
                 <span className="avatarBtn big">{user ? initial : <Icon name="user" />}</span>
@@ -1612,7 +1724,7 @@ export default function Home() {
           </section>}
 
           {view === 'library' && <section key="library" className="page">
-            <Header title="My Library" crumbs={['Home', 'Library']} onBack={back} />
+            <Header title="My Library" onBack={back} />
             <div className="menu">
               {libraryItems.map(([title, sub, icon, target]) => <button className="menuItem" key={title} onClick={() => openItem(target)}>
                 <span className="menuIcon"><Icon name={icon} /></span>
@@ -1623,7 +1735,7 @@ export default function Home() {
           </section>}
 
           {view === 'artists' && <section key="artists" className="page">
-            <Header title="All Songs" crumbs={['Home', 'Library', 'Songs']} onBack={back} />
+            <Header title="All Songs" onBack={back} />
             <div className="folders">
               {artists.map(a => <button className="folder" key={a.id} onClick={() => openArtist(a)}>
                 <span className="folderShape" />
@@ -1634,7 +1746,7 @@ export default function Home() {
           </section>}
 
           {view === 'albums' && <section key="albums" className="page">
-            <Header title="All Albums" crumbs={['Home', 'Library', 'Albums']} onBack={back} />
+            <Header title="All Albums" onBack={back} />
             {artists.map(a => <div className="padX" key={a.id}>
               <div className="sectionHead"><h2>{a.name}</h2><span>{totalOf('albums', a.id) || '…'} albums</span></div>
               <div className="albums">
@@ -1645,16 +1757,16 @@ export default function Home() {
           </section>}
 
           {view === 'artist' && <section key={`artist-${artist?.id || 'curr'}`} className="page">
-            <div className="headerBar pad">
-              <button className="iconBtn" onClick={back} aria-label="Back"><Icon name="back" /></button>
-              <span className="iconBtn"><Icon name="grid" fill size={18} /></span>
-            </div>
+            <Header onBack={back} />
             <div className="artistHero">
               <img src={artist.img} alt="" />
               <div>
                 <h1>{artist.name}</h1>
                 <p>{totalOf('songs', artist.id) || '…'} songs · {totalOf('albums', artist.id) || '…'} albums</p>
-                <button className="playAll" onClick={() => artistSongs[0] && playTrack(artistSongs[0], artistSongs)}><Icon name="play" fill size={16} />Play</button>
+                <div className="artistActions">
+                  <button className="playAll" onClick={() => artistSongs[0] && playTrack(artistSongs[0], artistSongs)}><Icon name="play" fill size={16} />Play</button>
+                  {artist.id && <button className={`followBtn ${isFav(artist) ? 'on' : ''}`} onClick={() => toggleFavArtist(artist)} aria-pressed={isFav(artist)}>{isFav(artist) ? 'Following' : 'Follow'}</button>}
+                </div>
               </div>
             </div>
             <div className="padX">
@@ -1717,35 +1829,57 @@ export default function Home() {
             />
           )}
 
+          {view === 'favArtists' && <section key="favArtists" className="page">
+            <Header title="Favorite Artists" onBack={back} />
+            <div className="padX">
+              {favArtists.length ? <div className="artistGrid">
+                {favArtists.map(a => <button className="artistCard" key={a.id} onClick={() => openArtist(a)}>
+                  <img src={a.img} alt="" />
+                  <strong>{a.name}</strong>
+                  <small>Artist</small>
+                </button>)}
+              </div> : <div className="empty">No favorite artists yet. Tap Follow on an artist page.</div>}
+            </div>
+          </section>}
+
           {view === 'liked' && <section key="liked" className="page">
-            <Header title="Liked Songs" crumbs={['Home', 'Library', 'Liked']} onBack={back} />
+            <Header title="Liked Songs" onBack={back} />
             <div className="list padX">
               {liked.length ? liked.map(item => <TrackRow key={keyOf(item)} track={item} active={isCurrent(item)} right={<Icon name="heart" fill size={16} />} onPlay={() => playTrack(item, liked)} />) : <div className="empty">No liked songs yet. Tap ♥ in the player.</div>}
             </div>
           </section>}
 
           {view === 'downloads' && <section key="downloads" className="page">
-            <Header title="Download" crumbs={['Home', 'Download']} onBack={back} action={downloads.length > 0 && <button className="clearAll" onClick={() => setDownloads([])}>Clear All</button>} />
+            <Header title="Download" onBack={back} action={downloads.length > 0 && <button className="clearAll" onClick={() => setDownloads([])}>Clear All</button>} />
             <div className="list padX">
               {downloads.length ? downloads.map(item => <TrackRow key={keyOf(item)} track={item} sub={`${item.artist} · ${new Date(item.date).toLocaleDateString()}`} active={isCurrent(item)} right={<span className="ring"><Icon name="play" fill size={12} /></span>} onPlay={() => playTrack(item, downloads)} />) : <div className="empty">Nothing downloaded yet. Use the download button in the player.</div>}
             </div>
           </section>}
 
           {view === 'history' && <section key="history" className="page">
-            <Header title="Recently Played" crumbs={['Home', 'Library', 'History']} onBack={back} action={history.length > 0 && <button className="clearAll" onClick={() => setHistory([])}>Clear All</button>} />
+            <Header title="Recently Played" onBack={back} action={history.length > 0 && <button className="clearAll" onClick={() => setHistory([])}>Clear All</button>} />
             <div className="list padX">
               {history.length ? history.map(item => <TrackRow key={keyOf(item)} track={item} sub={`${item.artist} · ${item.album || 'Single'}`} active={isCurrent(item)} right={<span className="ring"><Icon name="play" fill size={12} /></span>} onPlay={() => playTrack(item, history)} />) : <div className="empty">No playback history yet. Start playing any song!</div>}
             </div>
           </section>}
 
-          {view === 'player' && currentTrack && <section key={`player-${currentTrack.id}`} className="playerScreen">
+          {view === 'player' && currentTrack && <section key="player" className="playerScreen">
             <div className="playerTop">
               <button type="button" className="iconBtn" onClick={closePlayer} aria-label="Close player"><Icon name="down" size={26} /></button>
               <span />
               <button type="button" className="iconBtn" onClick={downloadCurrent} aria-label="Download"><Icon name="download" /></button>
             </div>
             <div className="playerMain">
-            <div className="art"><img src={currentTrack.img} alt="" /></div>
+            <div className="art" onPointerDown={onArtDown} onPointerMove={onArtMove} onPointerUp={onArtUp} onPointerCancel={onArtUp}>
+              <img
+                key={currentTrack.id}
+                className={swipe.dir > 0 ? 'fromRight' : swipe.dir < 0 ? 'fromLeft' : ''}
+                src={currentTrack.img}
+                alt=""
+                draggable={false}
+                style={{ transform: swipe.x ? `translateX(${swipe.x}px) rotate(${swipe.x / 40}deg)` : undefined, transition: swipe.anim ? 'transform .22s ease-out' : 'none' }}
+              />
+            </div>
             {isMixing && (
               <div className="automixBanner">
                 <span className="pulseWave">
@@ -1842,7 +1976,7 @@ export default function Home() {
             <div className="miniCenter">
               <div className="miniControls">
                 <button className="deskOnly" onClick={() => step(-1)} aria-label="Previous"><Icon name="prev" fill size={18} /></button>
-                <button className="miniPlay" style={{ '--p': `${progress}%` }} onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}><Icon name={isPlaying ? 'pause' : 'play'} fill size={14} /></button>
+                <button className="miniPlay" style={{ '--p': `${progress}%` }} onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}><Icon name={isPlaying ? 'pause' : 'play'} fill size={16} /></button>
                 <button className="deskOnly" onClick={() => step(1)} aria-label="Next"><Icon name="next" fill size={18} /></button>
               </div>
               <div className="miniProgress">
@@ -1951,7 +2085,17 @@ export default function Home() {
 
               {q && <>
                 {(showAll || searchTab === 'artists') && artistHits.length > 0 && <>
-                  <div className="sectionHead"><h2>Artists</h2></div>
+                  {favArtists.length > 0 && <>
+                  <div className="sectionHead"><h2>Your favorite artists</h2><button onClick={() => go('favArtists')}>Show all</button></div>
+                  <div className="artistsRow">
+                    {favArtists.map(a => <button className="artistCard" key={a.id} onClick={() => openArtist(a)}>
+                      <img src={a.img} alt="" />
+                      <strong>{a.name}</strong>
+                    </button>)}
+                  </div>
+                </>}
+
+                <div className="sectionHead"><h2>Artists</h2></div>
                   <div className="list">
                     {artistHits.map(a => <TrackRow key={a.id} track={{ song: a.name, img: a.img }} sub="Artist" round onPlay={() => openArtist(a)} right={<Icon name="right" size={16} />} />)}
                   </div>
@@ -1967,8 +2111,9 @@ export default function Home() {
                 {(showAll || searchTab === 'songs') && results.songs.length > 0 && <>
                   <div className="sectionHead"><h2>Songs</h2>{showAll && results.songs.length > 8 && <button onClick={() => setSearchTab('songs')}>Show all</button>}</div>
                   <div className="list">
-                    {(showAll ? results.songs.slice(0, 8) : results.songs).map(item => <TrackRow key={item.id} track={item} active={isCurrent(item)} sub={`${item.artist} · ${item.album}`} right={<Icon name="play" fill size={16} />} onPlay={() => playTrack(item)} />)}
+                    {(showAll ? results.songs.slice(0, 8) : results.songs).map(item => <TrackRow key={item.id} track={item} active={isCurrent(item)} sub={`${item.artist} · ${item.source === 'itunes' ? 'Apple Music preview' : item.album}`} right={<Icon name="play" fill size={16} />} onPlay={() => playTrack(item)} />)}
                   </div>
+                  {!showAll && results.more && <button className="loadMore" onClick={loadMoreSongs} disabled={loadingMoreSongs}>{loadingMoreSongs ? 'Loading…' : 'Load more songs'}</button>}
                 </>}
 
                 {searching && <ShimmerTrackRows count={6} />}

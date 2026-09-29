@@ -42,6 +42,7 @@ export async function POST(request) {
       password: hashedPassword,
       profile: initialData?.profile || { name: cleanName, languages: [], artists: [] },
       liked: Array.isArray(initialData?.liked) ? initialData.liked : [],
+      favArtists: Array.isArray(initialData?.favArtists) ? initialData.favArtists : [],
       downloads: Array.isArray(initialData?.downloads) ? initialData.downloads : [],
       history: Array.isArray(initialData?.history) ? initialData.history : [],
       createdAt: new Date(),
@@ -67,6 +68,7 @@ export async function POST(request) {
       data: {
         profile: newUser.profile,
         liked: newUser.liked,
+        favArtists: newUser.favArtists,
         downloads: newUser.downloads,
         history: newUser.history
       }

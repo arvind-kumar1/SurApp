@@ -41,6 +41,7 @@ export async function GET(request) {
       data: {
         profile: user.profile || { name: user.name, languages: [], artists: [] },
         liked: user.liked || [],
+        favArtists: user.favArtists || [],
         downloads: user.downloads || [],
         history: user.history || []
       }
