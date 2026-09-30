@@ -267,6 +267,7 @@ const icons = {
   trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14',
   shuffle: 'M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5',
   repeat: 'M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3',
+  repeatOne: 'M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3 M11 10.5l1.5-1.5v6M10.5 15h3',
   automix: 'M2 17h20M2 7h20M7 3v8M17 13v8M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
   plus: 'M12 5v14M5 12h14',
   clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
@@ -528,7 +529,58 @@ export default function Home() {
   const [queueIndex, setQueueIndex] = useState(-1);
   const [queueMode, setQueueMode] = useState('radio');
   const [shuffle, setShuffle] = useState(false);
-  const [repeat, setRepeat] = useState(false);
+  const [repeatMode, setRepeatMode] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sur-repeat');
+      if (saved === 'one' || saved === 'all' || saved === 'off') return saved;
+      if (saved === 'true') return 'one';
+    } catch {}
+    return 'off';
+  });
+  const repeat = repeatMode !== 'off';
+  const [playerToast, setPlayerToast] = useState(null);
+  const playerToastRef = useRef(null);
+
+  const showPlayerToast = (text, icon) => {
+    setPlayerToast({ text, icon });
+    clearTimeout(playerToastRef.current);
+    playerToastRef.current = setTimeout(() => {
+      setPlayerToast(null);
+    }, 2000);
+  };
+
+  const toggleRepeat = () => {
+    setRepeatMode(prev => {
+      let next = 'off';
+      let msg = 'Repeat: Off';
+      let icon = 'repeat';
+      if (prev === 'off') {
+        next = 'one';
+        msg = 'Repeat: Current song';
+        icon = 'repeatOne';
+      } else if (prev === 'one') {
+        next = 'all';
+        msg = 'Repeat: All tracks';
+        icon = 'repeat';
+      } else {
+        next = 'off';
+        msg = 'Repeat: Off';
+        icon = 'repeat';
+      }
+      try { localStorage.setItem('sur-repeat', next); } catch {}
+      try { trackEvent('repeat_mode_toggle', { mode: next }); } catch {}
+      showPlayerToast(msg, icon);
+      return next;
+    });
+  };
+
+  const toggleShuffle = () => {
+    setShuffle(prev => {
+      const next = !prev;
+      showPlayerToast(next ? 'Shuffle: On' : 'Shuffle: Off', 'shuffle');
+      return next;
+    });
+  };
   const [history, setHistory] = useState([]);
   const [searchHistory, setSearchHistory] = useState([]);
   const [stats, setStats] = useState({});
@@ -1069,10 +1121,53 @@ export default function Home() {
     setSwipe(current => ({ x: 0, anim: false, dir: current.dir }));
   }, [currentTrack?.id]);
 
+  const replayCurrentTrack = () => {
+    if (!audioRef.current || !currentTrack) return;
+    try {
+      audioRef.current.currentTime = 0;
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          if (currentTrack) streamTrack(currentTrack);
+        });
+      }
+    } catch {
+      if (currentTrack) streamTrack(currentTrack);
+    }
+    setProgress(0);
+    if (audioRef.current.duration) {
+      updateMediaPosition(0, audioRef.current.duration);
+    }
+    if (lyricsRef.current) lyricsRef.current.scrollTop = 0;
+    try { if (currentTrack) trackEvent('repeat_track', { song: currentTrack.song, artist: currentTrack.artist }); } catch {}
+  };
+
+  const handleEnded = () => {
+    if (repeatMode === 'one') {
+      replayCurrentTrack();
+      return;
+    }
+    if (repeatMode === 'off' && queueMode === 'list' && queueIndex >= queue.length - 1) {
+      setIsPlaying(false);
+      return;
+    }
+    step(1);
+  };
+
   const step = (delta, isAutomixTransition = false) => {
     if (!queue.length) return;
     if (queueMode === 'list') {
-      const index = shuffle && delta > 0 ? queue.indexOf(upNext) : (queueIndex + delta + queue.length) % queue.length;
+      let index = queueIndex + delta;
+      if (shuffle && delta > 0 && upNext) {
+        index = queue.indexOf(upNext);
+      } else if (repeatMode === 'all') {
+        index = (queueIndex + delta + queue.length) % queue.length;
+      } else if (index < 0) {
+        index = 0;
+      } else if (index >= queue.length) {
+        setIsPlaying(false);
+        return;
+      }
       setQueueIndex(index);
       streamTrack(queue[index], isAutomixTransition);
       return;
@@ -1085,6 +1180,16 @@ export default function Home() {
     }
     setQueueIndex(index);
     streamTrack(queue[index] || upNext, isAutomixTransition);
+  };
+
+  const handlePrev = () => {
+    if (audioRef.current && audioRef.current.currentTime > 3) {
+      audioRef.current.currentTime = 0;
+      setProgress(0);
+      updateMediaPosition(0, duration);
+      return;
+    }
+    step(-1);
   };
 
   const togglePlay = async () => {
@@ -1252,8 +1357,18 @@ export default function Home() {
       })();
     }
 
-    // Automix: smart crossfade
-    if (automix && dur > 20) {
+    // Song Repeat & Automix handling
+    if (repeatMode === 'one') {
+      if (isMixing) setIsMixing(false);
+      audio.volume = 1;
+      // In case browser onEnded fails to trigger when reaching end of stream
+      if (dur > 0 && cur >= dur - 0.25 && !transitioningRef.current) {
+        transitioningRef.current = true;
+        replayCurrentTrack();
+        setTimeout(() => { transitioningRef.current = false; }, 1000);
+        return;
+      }
+    } else if (automix && dur > 20) {
       const timeLeft = dur - cur;
       if (timeLeft <= crossfadeSec && timeLeft > 0) {
         setIsMixing(true);
@@ -1263,9 +1378,13 @@ export default function Home() {
 
         // When reached within 0.8s of crossfade window, trigger seamless transition to next track
         if (timeLeft <= 0.8 && !transitioningRef.current) {
-          transitioningRef.current = true;
-          step(1, true);
-          setTimeout(() => { transitioningRef.current = false; }, 2000);
+          if (repeatMode === 'off' && queueMode === 'list' && queueIndex >= queue.length - 1) {
+            // End of list reached with repeat off: let it reach end and stop
+          } else {
+            transitioningRef.current = true;
+            step(1, true);
+            setTimeout(() => { transitioningRef.current = false; }, 2000);
+          }
         }
       } else {
         if (isMixing) setIsMixing(false);
@@ -1862,6 +1981,8 @@ export default function Home() {
               togglePlay={togglePlay}
               shuffle={shuffle}
               setShuffle={setShuffle}
+              repeatMode={repeatMode}
+              toggleRepeat={toggleRepeat}
               liked={liked}
               toggleLikeTrack={toggleLikeTrack}
               downloadTrack={downloadTrack}
@@ -1884,6 +2005,8 @@ export default function Home() {
               togglePlay={togglePlay}
               shuffle={shuffle}
               setShuffle={setShuffle}
+              repeatMode={repeatMode}
+              toggleRepeat={toggleRepeat}
               liked={liked}
               toggleLikeTrack={toggleLikeTrack}
               downloadTrack={downloadTrack}
@@ -1931,7 +2054,16 @@ export default function Home() {
           {view === 'player' && currentTrack && <section key="player" className="playerScreen">
             <div className="playerTop">
               <button type="button" className="iconBtn" onClick={closePlayer} aria-label="Close player"><Icon name="down" size={26} /></button>
-              <span />
+              {playerToast ? (
+                <div className="playerToastPill">
+                  <Icon name={playerToast.icon} size={14} />
+                  <span>{playerToast.text}</span>
+                </div>
+              ) : (
+                <span className="playerTopTitle">
+                  {repeatMode === 'one' ? 'Song Repeat Active' : queueMode === 'radio' ? 'Playing from Radio' : 'Playing from Queue'}
+                </span>
+              )}
               <button type="button" className="iconBtn" onClick={downloadCurrent} aria-label="Download"><Icon name="download" /></button>
             </div>
             <div className="playerMain">
@@ -1977,11 +2109,21 @@ export default function Home() {
             <input className="progress" type="range" min="0" max="100" value={progress} onChange={seek} style={{ '--p': `${progress}%` }} aria-label="Seek" />
             <div className="times"><span>{elapsed}</span><span>-{fmt(duration - currentTime)}</span></div>
             <div className="controls">
-              <button onClick={() => setShuffle(v => !v)} className={shuffle ? 'on' : ''} aria-label="Shuffle" aria-pressed={shuffle}><Icon name="shuffle" /></button>
-              <button onClick={() => step(-1)} aria-label="Previous"><Icon name="prev" fill size={30} /></button>
+              <button onClick={toggleShuffle} className={shuffle ? 'on' : ''} aria-label="Shuffle" aria-pressed={shuffle} title={shuffle ? 'Shuffle: On' : 'Shuffle: Off'}><Icon name="shuffle" /></button>
+              <button onClick={handlePrev} aria-label="Previous" title="Previous"><Icon name="prev" fill size={30} /></button>
               <button className="mainPlay" onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}><Icon name={isPlaying ? 'pause' : 'play'} fill size={32} /></button>
-              <button onClick={() => step(1)} aria-label="Next"><Icon name="next" fill size={30} /></button>
-              <button onClick={() => setRepeat(v => !v)} className={repeat ? 'on' : ''} aria-label="Repeat" aria-pressed={repeat}><Icon name="repeat" /></button>
+              <button onClick={() => step(1)} aria-label="Next" title="Next"><Icon name="next" fill size={30} /></button>
+              <button
+                type="button"
+                onClick={toggleRepeat}
+                className={`repeatBtn ${repeatMode !== 'off' ? 'on' : ''} ${repeatMode === 'one' ? 'repeatOne' : ''}`}
+                aria-label={repeatMode === 'one' ? 'Repeat Current Song' : repeatMode === 'all' ? 'Repeat All Tracks' : 'Repeat Off'}
+                aria-pressed={repeatMode !== 'off'}
+                title={repeatMode === 'one' ? 'Repeat: Current song' : repeatMode === 'all' ? 'Repeat: All tracks' : 'Repeat: Off'}
+              >
+                <Icon name={repeatMode === 'one' ? 'repeatOne' : 'repeat'} />
+                {repeatMode === 'all' && <span className="repeatDot" />}
+              </button>
             </div>
             <div className="playerBar">
               <button
@@ -1999,7 +2141,10 @@ export default function Home() {
             </div>
             <div className="playerSide">
             {upNext && <div className="upNext">
-              <div className="sectionHead"><h2>Up next</h2><span>{queueMode === 'radio' ? 'Similar vibe' : 'In order'}</span></div>
+              <div className="sectionHead">
+                <h2>Up next</h2>
+                <span>{repeatMode === 'one' ? 'Repeating current song' : queueMode === 'radio' ? 'Similar vibe' : 'In order'}</span>
+              </div>
               <TrackRow track={upNext} right={<Icon name="next" fill size={16} />} onPlay={() => step(1)} />
             </div>}
             <div className="lyrics">
@@ -2202,7 +2347,6 @@ export default function Home() {
         <audio
           ref={audioRef}
           preload="metadata"
-          loop={repeat}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={event => {
             const dur = event.currentTarget.duration;
@@ -2211,7 +2355,7 @@ export default function Home() {
           }}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
-          onEnded={() => step(1)}
+          onEnded={handleEnded}
         />
       </div>
     </main>

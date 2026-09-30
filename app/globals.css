@@ -458,6 +458,38 @@ kbd { font: inherit; font-size: 11px; font-weight: 600; padding: 3px 8px; border
 .playerTop { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; text-align: center; }
 .playerTop strong { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .playerTop .iconBtn { width: 44px; height: 44px; display: grid; place-items: center; }
+.playerTopTitle {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--sub);
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 8px;
+}
+.playerToastPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 auto;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgba(255, 51, 119, 0.18);
+  border: 1px solid rgba(255, 51, 119, 0.45);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  animation: miniSlideIn 0.2s ease both;
+  box-shadow: 0 4px 14px rgba(255, 51, 119, 0.25);
+}
+.playerToastPill svg {
+  color: var(--pink);
+  flex-shrink: 0;
+}
 .playerTopActions { display: flex; align-items: center; gap: 8px; }
 .automixPill {
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
@@ -519,6 +551,17 @@ kbd { font: inherit; font-size: 11px; font-weight: 600; padding: 3px 8px; border
 .controls { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5vh; }
 .controls button { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; }
 .controls button.on, .miniActions button.on, .likeBtn.on { color: var(--pink); }
+.controls button.repeatBtn { position: relative; }
+.controls button.repeatBtn .repeatDot {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--pink);
+}
 .controls .mainPlay { width: 72px; height: 72px; background: #fff; color: #000; }
 .progress { width: 100%; margin: 2vh 0 8px; height: 4px; appearance: none; border-radius: 4px; cursor: pointer; background: linear-gradient(to right, #fff var(--p), rgba(255, 255, 255, .25) var(--p)); }
 .progress::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; }

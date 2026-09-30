@@ -39,6 +39,8 @@ export default function DetailView({
   togglePlay,
   shuffle,
   setShuffle,
+  repeatMode = 'off',
+  toggleRepeat,
   liked = [],
   toggleLikeTrack,
   downloadTrack,
@@ -279,6 +281,18 @@ export default function DetailView({
           >
             <Icon name="shuffle" size={22} />
           </button>
+
+          {toggleRepeat && (
+            <button
+              type="button"
+              className={`detailIconBtn ${repeatMode !== 'off' ? 'active' : ''}`}
+              onClick={toggleRepeat}
+              title={repeatMode === 'one' ? 'Repeat: Current song' : repeatMode === 'all' ? 'Repeat: All tracks' : 'Repeat: Off'}
+              aria-label={repeatMode === 'one' ? 'Repeat Current Song' : repeatMode === 'all' ? 'Repeat All Tracks' : 'Repeat Off'}
+            >
+              <Icon name={repeatMode === 'one' ? 'repeatOne' : 'repeat'} size={22} />
+            </button>
+          )}
 
           <button
             type="button"
