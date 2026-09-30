@@ -6,7 +6,7 @@ import { verifyToken, COOKIE_NAME } from '@/lib/auth';
 
 // Google's sample non-skippable linear VAST tag: safe to test with before Ad Manager approves the account.
 const TEST_TAG = 'https://pubads.g.doubleclick.net/gampad/ads?iu=/21775744923/external/single_ad_samples&sz=640x480&cust_params=sample_ct%3Dlinear&ciu_szs=300x250%2C728x90&gdfp_req=1&output=vast&unviewed_position_start=1&env=vp&impl=s&correlator=';
-const DEFAULTS = { enabled: false, adTag: TEST_TAG, songsPerAd: 3 };
+const DEFAULTS = { enabled: false, adTag: TEST_TAG, songsPerAd: 3, bannerEnabled: false, bannerSlot: '' };
 
 async function isAdmin() {
   const token = (await cookies()).get(COOKIE_NAME)?.value;
@@ -24,10 +24,15 @@ export async function GET(request) {
   const limited = await rateLimit(request, 'ads-get', 60, 60);
   if (limited) return limited;
   try {
-    return NextResponse.json({ ...(await settings()), isAdmin: await isAdmin() });
+    const admin = await isAdmin();
+    return NextResponse.json({
+      ...(await settings()),
+      isAdmin: admin,
+      adsenseClient: process.env.NEXT_PUBLIC_ADSENSE_CLIENT || ''
+    });
   } catch (error) {
     console.error('Ads settings error:', error);
-    return NextResponse.json({ ...DEFAULTS, isAdmin: false });
+    return NextResponse.json({ ...DEFAULTS, isAdmin: false, adsenseClient: '' });
   }
 }
 
@@ -39,6 +44,8 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const update = {};
   if (typeof body.enabled === 'boolean') update.enabled = body.enabled;
+  if (typeof body.bannerEnabled === 'boolean') update.bannerEnabled = body.bannerEnabled;
+  if (typeof body.bannerSlot === 'string') update.bannerSlot = body.bannerSlot.trim();
   if (typeof body.adTag === 'string') {
     const adTag = body.adTag.trim() || TEST_TAG;
     if (!adTag.startsWith('https://') || adTag.length > 2000) {
@@ -48,5 +55,9 @@ export async function POST(request) {
   }
 
   await (await getDb()).collection('app_settings').updateOne({ _id: 'ads' }, { $set: update }, { upsert: true });
-  return NextResponse.json({ ...(await settings()), isAdmin: true });
+  return NextResponse.json({
+    ...(await settings()),
+    isAdmin: true,
+    adsenseClient: process.env.NEXT_PUBLIC_ADSENSE_CLIENT || ''
+  });
 }

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { extractColorFromImage } from '@/lib/color';
+import AdBanner from './AdBanner';
 
 const fmtDuration = sec => {
   if (!sec || isNaN(sec)) return '--:--';
@@ -41,6 +42,7 @@ export default function DetailView({
   setShuffle,
   repeatMode = 'off',
   toggleRepeat,
+  adsConfig,
   liked = [],
   toggleLikeTrack,
   downloadTrack,
@@ -332,6 +334,12 @@ export default function DetailView({
           </span>
         </div>
       </div>
+
+      {adsConfig?.bannerEnabled && (
+        <div style={{ padding: '0 28px' }}>
+          <AdBanner slot={adsConfig.bannerSlot} client={adsConfig.adsenseClient} />
+        </div>
+      )}
 
       {/* Track List Table */}
       <div className="detailTracksTable">

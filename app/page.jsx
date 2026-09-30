@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { track as trackEvent } from '@vercel/analytics';
 import DetailView from './DetailView';
 import AdBreak from './AdBreak';
+import AdBanner from './AdBanner';
 
 // Used until the listener picks their own artists in onboarding.
 const DEFAULT_ARTISTS = [
@@ -974,7 +975,7 @@ export default function Home() {
 
   // Ad breaks: every N songs, one non-skippable ad. The counter lives in localStorage,
   // so refreshing or killing the app brings the pending ad straight back.
-  const [adsConfig, setAdsConfig] = useState({ enabled: false, adTag: '', songsPerAd: 3, isAdmin: false });
+  const [adsConfig, setAdsConfig] = useState({ enabled: false, adTag: '', songsPerAd: 3, bannerEnabled: false, bannerSlot: '', isAdmin: false, adsenseClient: '' });
   const [adBreak, setAdBreak] = useState(null);
   const adCountRef = useRef(0);
   const setAdCount = n => {
@@ -1691,6 +1692,10 @@ export default function Home() {
                       </button>)}
                   {!quickPicks.length && Array.from({ length: 6 }).map((_, i) => <div key={i} className="quickTile shimmer" aria-hidden="true" />)}
                 </div>
+
+                {adsConfig.bannerEnabled && (
+                  <AdBanner slot={adsConfig.bannerSlot} client={adsConfig.adsenseClient} />
+                )}
                 {history.length > 0 && <>
                   <div className="sectionHead"><h2>Recently played</h2><button onClick={() => go('history')}>Show all</button></div>
                   <div className="albums scrollRow">
@@ -1882,23 +1887,43 @@ export default function Home() {
                   <span className="menuIcon"><Icon name="download" /></span>
                   <span className="rowText"><strong>Clear downloads list</strong><small>{downloads.length} songs</small></span>
                 </button>
-                {adsConfig.isAdmin && <div className="menuItem staticItem">
-                  <span className={`menuIcon ${adsConfig.enabled ? 'accentGrad' : ''}`}><Icon name="disc" /></span>
-                  <div className="rowText">
-                    <strong>Ads (owner)</strong>
-                    <small>{adsConfig.enabled ? `On for everyone · 1 ad every ${adsConfig.songsPerAd} songs` : 'Off for everyone'}</small>
+                {adsConfig.isAdmin && <>
+                  <div className="menuItem staticItem">
+                    <span className={`menuIcon ${adsConfig.enabled ? 'accentGrad' : ''}`}><Icon name="disc" /></span>
+                    <div className="rowText">
+                      <strong>Audio Ad Breaks (owner)</strong>
+                      <small>{adsConfig.enabled ? `On for everyone · 1 ad every ${adsConfig.songsPerAd} songs` : 'Off for everyone'}</small>
+                    </div>
+                    <button type="button" className={`toggleSwitch ${adsConfig.enabled ? 'on' : ''}`} onClick={() => saveAds({ enabled: !adsConfig.enabled })} role="switch" aria-checked={adsConfig.enabled} aria-label="Toggle audio ads">
+                      <span className="toggleHandle" />
+                    </button>
                   </div>
-                  <button type="button" className={`toggleSwitch ${adsConfig.enabled ? 'on' : ''}`} onClick={() => saveAds({ enabled: !adsConfig.enabled })} role="switch" aria-checked={adsConfig.enabled} aria-label="Toggle ads">
-                    <span className="toggleHandle" />
-                  </button>
-                </div>}
-                {adsConfig.isAdmin && <form className="adTagForm" onSubmit={e => { e.preventDefault(); saveAds({ adTag: e.currentTarget.adTag.value }); }}>
-                  <label htmlFor="adTag">Ad Manager VAST tag URL <small>(empty = Google test ad)</small></label>
-                  <div>
-                    <input id="adTag" name="adTag" defaultValue={adsConfig.adTag} key={adsConfig.adTag} placeholder="https://pubads.g.doubleclick.net/gampad/ads?..." />
-                    <button type="submit" className="loginBtn">Save</button>
+                  {adsConfig.enabled && <form className="adTagForm" onSubmit={e => { e.preventDefault(); saveAds({ adTag: e.currentTarget.adTag.value }); }}>
+                    <label htmlFor="adTag">Ad Manager VAST tag URL <small>(empty = Google test ad)</small></label>
+                    <div>
+                      <input id="adTag" name="adTag" defaultValue={adsConfig.adTag} key={adsConfig.adTag} placeholder="https://pubads.g.doubleclick.net/gampad/ads?..." />
+                      <button type="submit" className="loginBtn">Save</button>
+                    </div>
+                  </form>}
+
+                  <div className="menuItem staticItem">
+                    <span className={`menuIcon ${adsConfig.bannerEnabled ? 'accentGrad' : ''}`}><Icon name="album" /></span>
+                    <div className="rowText">
+                      <strong>Banner Ads (owner)</strong>
+                      <small>{adsConfig.bannerEnabled ? 'Banner ads active for everyone' : 'Off for everyone'}</small>
+                    </div>
+                    <button type="button" className={`toggleSwitch ${adsConfig.bannerEnabled ? 'on' : ''}`} onClick={() => saveAds({ bannerEnabled: !adsConfig.bannerEnabled })} role="switch" aria-checked={adsConfig.bannerEnabled} aria-label="Toggle banner ads">
+                      <span className="toggleHandle" />
+                    </button>
                   </div>
-                </form>}
+                  {adsConfig.bannerEnabled && <form className="adTagForm" onSubmit={e => { e.preventDefault(); saveAds({ bannerSlot: e.currentTarget.bannerSlot.value }); }}>
+                    <label htmlFor="bannerSlot">AdSense Banner Slot ID <small>(optional, leave empty for auto responsive)</small></label>
+                    <div>
+                      <input id="bannerSlot" name="bannerSlot" defaultValue={adsConfig.bannerSlot || ''} key={adsConfig.bannerSlot} placeholder="e.g. 1234567890 (or leave empty)" />
+                      <button type="submit" className="loginBtn">Save</button>
+                    </div>
+                  </form>}
+                </>}
                 {user && <button className="menuItem" onClick={signOut}>
                   <span className="menuIcon danger"><Icon name="logout" /></span>
                   <span className="rowText"><strong>Log out</strong><small>Signed in as {user.email}</small></span>
@@ -1983,6 +2008,7 @@ export default function Home() {
               setShuffle={setShuffle}
               repeatMode={repeatMode}
               toggleRepeat={toggleRepeat}
+              adsConfig={adsConfig}
               liked={liked}
               toggleLikeTrack={toggleLikeTrack}
               downloadTrack={downloadTrack}
@@ -2007,6 +2033,7 @@ export default function Home() {
               setShuffle={setShuffle}
               repeatMode={repeatMode}
               toggleRepeat={toggleRepeat}
+              adsConfig={adsConfig}
               liked={liked}
               toggleLikeTrack={toggleLikeTrack}
               downloadTrack={downloadTrack}
@@ -2250,6 +2277,9 @@ export default function Home() {
               {searchTabs.map(([id, label]) => <button key={id} role="tab" aria-selected={searchTab === id} className={searchTab === id ? 'on' : ''} onClick={() => setSearchTab(id)}>{label}</button>)}
             </div>
             <div className="searchBody">
+              {adsConfig.bannerEnabled && (
+                <AdBanner slot={adsConfig.bannerSlot} client={adsConfig.adsenseClient} />
+              )}
               {!q && <>
                 {searchHistory.length > 0 && <>
                   <div className="sectionHead">

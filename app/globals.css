@@ -1634,3 +1634,82 @@ kbd { font: inherit; font-size: 11px; font-weight: 600; padding: 3px 8px; border
 .adTagForm > div { display: flex; gap: 8px; }
 .adTagForm input { flex: 1; min-width: 0; height: 42px; padding: 0 12px; border-radius: 10px; background: rgba(255, 255, 255, .06); border: 1px solid var(--stroke); color: var(--fg); font: inherit; font-size: 12px; outline: 0; }
 .adTagForm input:focus { border-color: var(--pink); }
+
+/* Banner Ads */
+.adBannerContainer {
+  margin: 18px 0;
+  width: 100%;
+  animation: miniSlideIn 0.3s ease both;
+}
+.adBannerTag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--sub);
+  margin-bottom: 6px;
+  opacity: 0.8;
+}
+.adBannerCard {
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  -webkit-backdrop-filter: var(--blur);
+  backdrop-filter: var(--blur);
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.adBannerPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+.adPlaceholderLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.adPlaceholderLeft strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.adPlaceholderLeft p {
+  font-size: 11px;
+  color: var(--sub);
+  margin: 2px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.adCtaBtn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  background: #fff;
+  color: #000;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.adCtaBtn:hover {
+  transform: scale(1.05);
+  background: var(--pink);
+  color: #fff;
+}
+
