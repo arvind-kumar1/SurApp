@@ -889,9 +889,12 @@ export default function Home() {
     setLoadingMoreSongs(false);
   };
 
-  const openSearch = (value = query) => {
+  // fromY: screen top of the search pill that was tapped, so the field can rise from it.
+  const [searchFromY, setSearchFromY] = useState(null);
+  const openSearch = (value = query, fromY = null) => {
     setQuery(value);
     if (searchOpen) return;
+    setSearchFromY(fromY);
     setSearchOpen(true);
   };
   const closeSearch = () => {
@@ -1655,7 +1658,7 @@ export default function Home() {
           {view === 'search' && <section key="search" className="page">
             <Header title="Search" onBack={back} />
             <div className="searchSticky">
-              <button className="searchPill" onClick={() => openSearch('')}>
+              <button className="searchPill" onClick={event => openSearch('', event.currentTarget.getBoundingClientRect().top)}>
                 <Icon name="search" size={22} />
                 <span>What do you want to listen to?</span>
               </button>
@@ -2088,12 +2091,14 @@ export default function Home() {
         </div>
 
         {searchOpen && <div className="searchOverlay" onClick={closeSearch}>
-          <div className="searchModal" role="dialog" aria-modal="true" aria-label="Search" onClick={event => event.stopPropagation()}>
+          <div className={`searchModal ${searchFromY != null ? 'fromPill' : ''}`} style={searchFromY != null ? { '--from-y': `${searchFromY}px` } : undefined} role="dialog" aria-modal="true" aria-label="Search" onClick={event => event.stopPropagation()}>
             <div className="searchField">
               <button className="iconBtn modalBack" onClick={closeSearch} aria-label="Back"><Icon name="back" /></button>
-              <Icon name="search" />
-              <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search songs, albums or artists" autoComplete="off" aria-label="Search" />
-              {query && <button className="clearBtn" onClick={() => setQuery('')} aria-label="Clear search"><Icon name="close" size={18} /></button>}
+              <label className="searchInput">
+                <Icon name="search" />
+                <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="What do you want to listen to?" autoComplete="off" aria-label="Search" />
+                {query && <button className="clearBtn" onClick={() => setQuery('')} aria-label="Clear search"><Icon name="close" size={18} /></button>}
+              </label>
               <button className="escBtn" onClick={closeSearch}>Esc</button>
             </div>
             <div className="searchTabs" role="tablist">
@@ -2185,7 +2190,7 @@ export default function Home() {
           </div>
         </div>}
 
-        {adBreak && <AdBreak adTag={adsConfig.adTag} onDone={finishAd} />}
+        {adBreak && <AdBreak adTag={adsConfig.adTag} next={adBreak.track} Icon={Icon} onDone={finishAd} />}
         {auth && <AuthModal mode={auth.mode} defaultName={profile?.name} onDone={finishAuth} onClose={() => setAuth(null)} />}
 
         {ready && (!profile || editingTaste) && <Onboarding

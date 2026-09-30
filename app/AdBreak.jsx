@@ -14,15 +14,20 @@ const loadIma = () => imaPromise ||= new Promise((resolve, reject) => {
   document.head.appendChild(script);
 });
 
-// Full-screen ad break with no close button. onDone(true) after the ad plays, onDone(false) if no ad could be shown.
-export default function AdBreak({ adTag, onDone }) {
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+// Spotify-style ad break: looks like the player, ad in the artwork slot, no skip/close.
+// onDone(true) after the ad plays, onDone(false) if no ad could be shown.
+export default function AdBreak({ adTag, next, Icon, onDone }) {
   const slotRef = useRef(null);
   const videoRef = useRef(null);
   const managerRef = useRef(null);
   const timersRef = useRef([]);
   const doneRef = useRef(false);
   const [ready, setReady] = useState(false);
-  const [playing, setPlaying] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [duration, setDuration] = useState(0);
   const [left, setLeft] = useState(null);
 
   const finish = ok => {
@@ -47,7 +52,7 @@ export default function AdBreak({ adTag, onDone }) {
   const start = () => {
     const ima = window.google?.ima;
     if (!ima) return finish(false);
-    setPlaying(true);
+    setStarted(true);
     const { width, height } = slotRef.current.getBoundingClientRect();
     const display = new ima.AdDisplayContainer(slotRef.current, videoRef.current);
     display.initialize();
@@ -59,14 +64,17 @@ export default function AdBreak({ adTag, onDone }) {
       manager.addEventListener(ima.AdErrorEvent.Type.AD_ERROR, () => finish(false));
       manager.addEventListener(ima.AdEvent.Type.ALL_ADS_COMPLETED, () => finish(true));
       manager.addEventListener(ima.AdEvent.Type.CONTENT_RESUME_REQUESTED, () => finish(true));
+      manager.addEventListener(ima.AdEvent.Type.STARTED, e => setDuration(Math.max(0, e.getAd()?.getDuration() || 0)));
+      manager.addEventListener(ima.AdEvent.Type.PAUSED, () => setPaused(true));
+      manager.addEventListener(ima.AdEvent.Type.RESUMED, () => setPaused(false));
       try {
         manager.init(width, height, ima.ViewMode.NORMAL);
         manager.start();
       } catch { return finish(false); }
       timersRef.current.push(setInterval(() => {
         const remaining = manager.getRemainingTime();
-        if (remaining >= 0) setLeft(Math.ceil(remaining));
-      }, 500));
+        if (remaining >= 0) setLeft(remaining);
+      }, 250));
     });
     loader.addEventListener(ima.AdErrorEvent.Type.AD_ERROR, () => finish(false));
 
@@ -81,19 +89,45 @@ export default function AdBreak({ adTag, onDone }) {
     timersRef.current.push(setTimeout(() => !managerRef.current && finish(false), 12000));
   };
 
+  const togglePlay = () => {
+    if (!started) return start();
+    const manager = managerRef.current;
+    if (!manager) return;
+    paused ? manager.resume() : manager.pause();
+  };
+
+  const elapsed = duration && left != null ? Math.max(0, duration - left) : 0;
+  const pct = duration ? Math.min(100, (elapsed / duration) * 100) : 0;
+  const playing = started && !paused;
+
   return (
     <div className="adBreak" role="dialog" aria-modal="true" aria-label="Advertisement">
-      <div className="adBreakTop">
-        <span className="adBadge">Ad</span>
-        <span>{playing ? (left != null ? `Your music continues in ${left}s` : 'Loading ad…') : 'Your music continues after this short ad'}</span>
+      <div className="playerTop">
+        <span />
+        <strong>Advertisement</strong>
+        <span />
       </div>
-      <div className="adSlot" ref={slotRef}>
-        <video ref={videoRef} playsInline muted className="adContent" />
-        {!playing && (
-          <button type="button" className="adStart" onClick={start} disabled={!ready}>
-            {ready ? 'Play ad' : 'Loading…'}
-          </button>
-        )}
+      <div className="adArt">
+        <div className="adSlot" ref={slotRef}>
+          <div className="adPoster" aria-hidden="true"><span className="adBadge">Ad</span><strong>Sur</strong></div>
+          <video ref={videoRef} playsInline muted className="adContent" />
+        </div>
+      </div>
+      <div className="trackInfo">
+        <div>
+          <h2>Advertisement</h2>
+          <p>{!started ? 'Your music continues after this short ad' : left == null ? 'Loading ad…' : next ? `Up next: ${next.song}` : 'Your music continues shortly'}</p>
+        </div>
+        <span className="adBadge">Ad</span>
+      </div>
+      <div className="progress adProgress" style={{ '--p': `${pct}%` }} role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label="Ad progress" />
+      <div className="times"><span>{fmt(elapsed)}</span><span>{left != null ? `-${fmt(left)}` : '--:--'}</span></div>
+      <div className="controls">
+        <button disabled aria-label="Shuffle"><Icon name="shuffle" /></button>
+        <button disabled aria-label="Previous"><Icon name="prev" fill size={30} /></button>
+        <button className="mainPlay" onClick={togglePlay} disabled={!ready} aria-label={playing ? 'Pause ad' : 'Play ad'}><Icon name={playing ? 'pause' : 'play'} fill size={32} /></button>
+        <button disabled aria-label="Next"><Icon name="next" fill size={30} /></button>
+        <button disabled aria-label="Repeat"><Icon name="repeat" /></button>
       </div>
       <p className="adNote">Ads keep Sur free to use.</p>
     </div>
